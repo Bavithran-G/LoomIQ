@@ -208,7 +208,7 @@ def reports(db: Session = Depends(get_db), _: User = Depends(require("insights.v
 # ---------------- buyer portal (server-side scoped to the buyer's own records) ----------------
 def _buyer_order(db: Session, user: User, oid: int) -> SalesOrder:
     o = db.get(SalesOrder, oid)
-    if not o or o.buyer_id != user.buyer_id:
+    if not o or o.buyer_id != user.buyer_id or o.status == OrderStatus.draft:
         raise NotFound("Order")    # 404, not 403: do not reveal other buyers' order ids
     return o
 
@@ -218,8 +218,8 @@ def portal_orders(db: Session = Depends(get_db), user: User = Depends(require("p
     if not user.buyer_id:
         return []
     return [order_buyer_out(db, o) for o in db.scalars(
-        select(SalesOrder).where(SalesOrder.buyer_id == user.buyer_id)
-        .order_by(SalesOrder.id.desc()))]
+        select(SalesOrder).where(SalesOrder.buyer_id == user.buyer_id, SalesOrder.status != OrderStatus.draft)
+        .order_by(SalesOrder.promised_date))]
 
 
 @router.get("/portal/orders/{oid}")
