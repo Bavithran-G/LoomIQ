@@ -221,7 +221,7 @@ export default function Login() {
             {tab === 'signin' ? (
               <>
                 <div className="mb-6">
-                  <h1 className="text-[22px] font-bold text-indigo-loom">Mill Access Portal</h1>
+                  <h1 className="text-[22px] font-bold text-indigo-loom">Access Portal</h1>
                   <p className="mt-1 text-[13.5px] text-ink-3">
                     Sign in with your staff account or click any role profile on the right to test instantly.
                   </p>
