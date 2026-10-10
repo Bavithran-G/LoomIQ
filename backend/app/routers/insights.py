@@ -13,8 +13,8 @@ from ..models import (Buyer, Dispatch, DispatchStatus, Event, FabricSpec, Inspec
 from ..security import create_token, current_user, hash_password, permissions_for, require, verify_password
 from ..serializers import dispatch_out, order_buyer_out, user_out
 from ..services import costing, dashboard, risk, simulator
-from ..services.core import BusinessError, NotFound, money, today
-from ..services.orders import order_metrics
+from ..services.core import BusinessError, NotFound, money, next_number, today
+from ..services.orders import create_order as svc_create_order, order_metrics
 
 router = APIRouter(prefix="/api", tags=["insights"])
 
@@ -208,7 +208,7 @@ def reports(db: Session = Depends(get_db), _: User = Depends(require("insights.v
 # ---------------- buyer portal (server-side scoped to the buyer's own records) ----------------
 def _buyer_order(db: Session, user: User, oid: int) -> SalesOrder:
     o = db.get(SalesOrder, oid)
-    if not o or o.buyer_id != user.buyer_id or o.status == OrderStatus.draft:
+    if not o or o.buyer_id != user.buyer_id:
         raise NotFound("Order")    # 404, not 403: do not reveal other buyers' order ids
     return o
 
@@ -218,8 +218,8 @@ def portal_orders(db: Session = Depends(get_db), user: User = Depends(require("p
     if not user.buyer_id:
         return []
     return [order_buyer_out(db, o) for o in db.scalars(
-        select(SalesOrder).where(SalesOrder.buyer_id == user.buyer_id, SalesOrder.status != OrderStatus.draft)
-        .order_by(SalesOrder.promised_date))]
+        select(SalesOrder).where(SalesOrder.buyer_id == user.buyer_id)
+        .order_by(SalesOrder.id.desc()))]
 
 
 @router.get("/portal/orders/{oid}")
@@ -243,6 +243,73 @@ def portal_order(oid: int, db: Session = Depends(get_db), user: User = Depends(r
                        for x in db.scalars(select(Dispatch).where(Dispatch.order_id == o.id,
                                                                   Dispatch.status != DispatchStatus.cancelled))]
     return d
+
+
+# ---- buyer portal: reference data & order creation ----
+
+class BuyerOrderIn(BaseModel):
+    buyer_po: str = Field(min_length=1, max_length=40)
+    fabric_spec_id: int
+    colour: str = Field(min_length=1, max_length=40)
+    quantity: float = Field(gt=0)
+    promised_date: date
+    notes: str = ""
+
+
+def _ensure_buyer(db: Session, user: User) -> "Buyer":
+    """Return the buyer linked to this user, auto-creating one if newly registered."""
+    if user.buyer_id:
+        b = db.get(Buyer, user.buyer_id)
+        if b:
+            return b
+    # Auto-create a Buyer record for newly registered buyer accounts
+    code_base = user.username.upper().replace(".", "").replace("_", "")[:10]
+    existing_codes = {r for (r,) in db.execute(select(Buyer.code).where(Buyer.code.like(f"{code_base}%")))}
+    code = code_base
+    i = 2
+    while code in existing_codes:
+        code = f"{code_base}{i}"
+        i += 1
+    buyer = Buyer(code=code, name=user.full_name, city="", contact_email="")
+    db.add(buyer)
+    db.flush()
+    user.buyer_id = buyer.id
+    return buyer
+
+
+@router.get("/portal/fabric-specs")
+def portal_fabric_specs(db: Session = Depends(get_db), _: User = Depends(require("portal.view"))):
+    """Fabric specs available for buyers to choose when creating an order."""
+    return [{"id": s.id, "code": s.code, "name": s.name,
+             "construction": s.construction, "gsm": s.gsm, "width_cm": s.width_cm}
+            for s in db.scalars(select(FabricSpec).order_by(FabricSpec.code))]
+
+
+@router.post("/portal/orders", status_code=201)
+def portal_create_order(body: BuyerOrderIn, db: Session = Depends(get_db),
+                        user: User = Depends(require("portal.view"))):
+    """Buyers create their own orders. buyer_id is always derived from the authenticated session."""
+    from ..services.orders import create_order as svc_create_order
+    buyer = _ensure_buyer(db, user)
+    order_date = today()
+    if body.promised_date <= order_date:
+        raise BusinessError("Delivery date must be in the future", 422)
+    data = {
+        "buyer_id": buyer.id,
+        "buyer_po": body.buyer_po,
+        "fabric_spec_id": body.fabric_spec_id,
+        "colour": body.colour,
+        "quantity": body.quantity,
+        "order_date": order_date,
+        "promised_date": body.promised_date,
+        "priority": "normal",
+        "notes": body.notes,
+        "internal_notes": "",
+    }
+    order = svc_create_order(db, data, user)
+    db.commit()
+    db.refresh(order)
+    return order_buyer_out(db, order)
 
 
 # ---------------- admin ----------------

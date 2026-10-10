@@ -1,30 +1,19 @@
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import KineticGrid from '../components/ui/kinetic-grid'
 import { Wordmark } from '../components/brand'
 import {
   Factory,
   ShieldCheck,
-  TrendingUp,
   Truck,
   Package,
-  Layers,
   ArrowRight,
-  QrCode,
-  Users,
   CheckCircle2,
-  Clock,
   Sparkles,
   ChevronRight,
-  Cpu,
-  BarChart3,
-  Flame,
-  Check
 } from 'lucide-react'
 
 export default function Landing() {
   const nav = useNavigate()
-  const [activeTab, setActiveTab] = useState<'problem' | 'solution'>('solution')
 
   const workflowSteps = [
     {

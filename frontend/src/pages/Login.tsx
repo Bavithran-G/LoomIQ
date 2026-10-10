@@ -4,20 +4,12 @@ import { useAuth } from '../lib/auth'
 import { Button, Field, Input, Notice } from '../components/ui'
 import KineticGrid from '../components/ui/kinetic-grid'
 import { Wordmark } from '../components/brand'
-import { ROLES } from '../lib/format'
 import { api } from '../lib/api'
 import {
   CheckCircle,
-  Factory,
-  ShieldCheck,
-  TrendingUp,
-  Truck,
-  Package,
   ArrowLeft,
-  Sparkles,
   Info,
   UserCheck,
-  Layers,
   ChevronRight
 } from 'lucide-react'
 
