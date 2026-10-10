@@ -1,0 +1,73 @@
+@import "@fontsource/barlow/400.css";
+@import "@fontsource/barlow/500.css";
+@import "@fontsource/barlow/600.css";
+@import "@fontsource/barlow-semi-condensed/500.css";
+@import "@fontsource/barlow-semi-condensed/600.css";
+@import "@fontsource/barlow-semi-condensed/700.css";
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Barlow", system-ui, sans-serif;
+  --font-display: "Barlow Semi Condensed", "Barlow", system-ui, sans-serif;
+
+  --color-indigo-loom: #13294b;     /* navigation, headings */
+  --color-indigo-deep: #0c1c36;
+  --color-indigo-thread: #2f4b8a;   /* brand thread, links */
+  --color-indigo-mist: #8fa6cc;
+  --color-page: #f5f7fa;
+  --color-surface: #ffffff;
+  --color-sunk: #eef1f5;
+  --color-line: #e1e6ed;
+  --color-line-strong: #c9d1dc;
+  --color-ink: #1a2333;
+  --color-ink-2: #4a5568;
+  --color-ink-3: #75808f;
+  --color-ok: #0e8a7e;
+  --color-ok-soft: #e3f4f1;
+  --color-warn: #b7791f;
+  --color-warn-soft: #fbf1df;
+  --color-bad: #c2362f;
+  --color-bad-soft: #fbe9e7;
+  --color-info-soft: #e8eef8;
+}
+
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--color-page);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, h4 { font-family: var(--font-display); color: var(--color-indigo-loom); margin: 0; letter-spacing: -0.005em; }
+:focus-visible { outline: 2px solid var(--color-indigo-thread); outline-offset: 2px; border-radius: 4px; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+
+/* Woven twill fill used for completed production on the thread strip */
+.twill {
+  background-color: var(--fill, var(--color-ok));
+  background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.22) 0 2px, transparent 2px 6px);
+}
+.twill-warn { --fill: var(--color-warn); }
+.twill-bad { --fill: var(--color-bad); }
+.twill-indigo { --fill: var(--color-indigo-thread); }
+
+.skeleton { background: linear-gradient(90deg, var(--color-sunk) 0%, #f7f9fb 50%, var(--color-sunk) 100%); background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: 6px; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } * { transition: none !important; } }
+
+.data-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.data-table th { text-align: left; font-weight: 600; color: var(--color-ink-2); font-size: 13px; padding: 8px 12px; border-bottom: 1px solid var(--color-line-strong); background: var(--color-sunk); white-space: nowrap; position: sticky; top: 0; }
+.data-table td { padding: 9px 12px; border-bottom: 1px solid var(--color-line); vertical-align: middle; }
+.data-table tbody tr:hover { background: #fafbfd; }
+.data-table .num { text-align: right; }
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: white; }
+  .print-area { box-shadow: none !important; border: none !important; }
+}
