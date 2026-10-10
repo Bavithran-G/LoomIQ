@@ -19,16 +19,24 @@ let onUnauthorized: () => void = () => {}
 export function setUnauthorizedHandler(fn: () => void) { onUnauthorized = fn }
 
 function message(body: unknown, status: number): string {
-  if (body && typeof body === 'object' && 'detail' in body) {
-    const d = (body as { detail: unknown }).detail
-    if (typeof d === 'string') return d
-    if (Array.isArray(d)) {
-      return d.map((e: { loc?: unknown[]; msg?: string }) => {
-        const field = (e.loc ?? []).filter((x) => x !== 'body').join('.')
-        return field ? `${field}: ${e.msg}` : e.msg
-      }).join('; ')
+  if (body && typeof body === 'object') {
+    if ('detail' in body) {
+      const d = (body as { detail: unknown }).detail
+      if (typeof d === 'string') return d
+      if (Array.isArray(d)) {
+        return d.map((e: { loc?: unknown[]; msg?: string }) => {
+          const field = (e.loc ?? []).filter((x) => x !== 'body').join('.')
+          return field ? `${field}: ${e.msg}` : e.msg
+        }).join('; ')
+      }
+    }
+    if ('message' in body && typeof (body as { message: unknown }).message === 'string') {
+      return (body as { message: string }).message
     }
   }
+  if (typeof body === 'string' && body.trim()) return body
+  if (status === 401) return 'Incorrect username or password.'
+  if (status === 403) return 'You do not have permission to access this resource.'
   if (status >= 500) return 'The server hit an error. Try again; if it repeats, check the backend log.'
   return `Request failed (${status})`
 }
