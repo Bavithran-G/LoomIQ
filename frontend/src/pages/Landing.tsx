@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
+import KineticGrid from '../components/ui/kinetic-grid'
 import { Wordmark } from '../components/brand'
 import {
   Factory,
@@ -117,52 +118,58 @@ export default function Landing() {
       </header>
 
       {/* ── Hero Section ── */}
-      <section className="relative overflow-hidden pt-16 pb-20 lg:pt-24 lg:pb-32 border-b border-line bg-gradient-to-b from-white via-page to-sunk/40">
-        <div className="absolute inset-0 pointer-events-none opacity-[0.035] bg-[radial-gradient(#13294b_1px,transparent_1px)] [background-size:16px_16px]" />
-        
-        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-indigo-mist/30 bg-indigo-mist/10 px-3.5 py-1 text-[13px] font-medium text-indigo-loom mb-6">
-            <Sparkles className="size-3.5 text-[#2BB3A3]" />
-            <span>Built for Odoo Hackathon · Replacing Notebooks & Phone Calls</span>
+      <section className="relative border-b border-line" style={{ minHeight: '92vh' }}>
+        <KineticGrid
+          className="min-h-[92vh]"
+          globalColor="default"
+        >
+          {/* Gradient overlay at bottom to blend into next section */}
+          <div className="absolute bottom-0 left-0 right-0 h-32 pointer-events-none bg-gradient-to-t from-black/40 to-transparent z-[5]" />
+
+          <div className="relative flex flex-col items-center justify-center min-h-[92vh] px-4 sm:px-6 lg:px-8 text-center">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3.5 py-1 text-[13px] font-medium text-white/80 mb-6 backdrop-blur-sm">
+              <Sparkles className="size-3.5 text-[#2BB3A3]" />
+              <span>Built for Odoo Hackathon · Replacing Notebooks &amp; Phone Calls</span>
+            </div>
+
+            <h1 className="mx-auto max-w-4xl font-display text-[42px] leading-[1.08] font-bold text-white sm:text-[56px] lg:text-[64px] drop-shadow-lg">
+              The Digital Backbone of a Busy Fabric Factory
+            </h1>
+
+            <p className="mx-auto mt-6 max-w-2xl text-[17px] leading-relaxed text-white/70 sm:text-[19px]">
+              LoomIQ unifies yarn procurement, loom floor scheduling, AI-assisted quality inspection,{' '}
+              and roll dispatch on <strong className="text-white">one synchronized database</strong> for Everest Textile Mills.
+            </p>
+
+            <div className="mt-9 flex flex-wrap items-center justify-center gap-4" style={{ pointerEvents: 'auto' }}>
+              <button
+                onClick={() => nav('/login')}
+                className="flex items-center gap-2 rounded-xl bg-[#4a9eff] px-6 py-3.5 text-[15.5px] font-semibold text-white shadow-lg shadow-[#4a9eff]/30 hover:bg-[#3a8aee] transition-all transform active:scale-[0.98]"
+              >
+                <span>Explore With Demo Accounts</span>
+                <ArrowRight className="size-4 text-[#2BB3A3]" />
+              </button>
+              <a
+                href="#workflow"
+                className="flex items-center gap-2 rounded-xl border border-white/25 bg-white/10 backdrop-blur-sm px-6 py-3.5 text-[15.5px] font-semibold text-white shadow-sm hover:bg-white/20 transition-all"
+              >
+                <span>See Day-at-the-Mill Workflow</span>
+                <ChevronRight className="size-4" />
+              </a>
+            </div>
+
+            {/* Quick Stats banner */}
+            <div className="mt-16 grid grid-cols-2 gap-3 sm:grid-cols-4 max-w-4xl mx-auto" style={{ pointerEvents: 'auto' }}>
+              {metrics.map((m) => (
+                <div key={m.label} className="rounded-xl border border-white/15 bg-white/10 backdrop-blur-md p-4 text-center shadow-xs">
+                  <div className="font-display text-[26px] font-bold text-[#4a9eff]">{m.val}</div>
+                  <div className="text-[13px] font-semibold text-white">{m.label}</div>
+                  <div className="text-[11.5px] text-white/50 mt-0.5">{m.sub}</div>
+                </div>
+              ))}
+            </div>
           </div>
-
-          <h1 className="mx-auto max-w-4xl font-display text-[42px] leading-[1.08] font-bold text-indigo-loom sm:text-[56px] lg:text-[64px]">
-            The Digital Backbone of a Busy Fabric Factory
-          </h1>
-
-          <p className="mx-auto mt-6 max-w-2xl text-[17px] leading-relaxed text-ink-2 sm:text-[19px]">
-            LoomIQ unifies yarn procurement, loom floor scheduling, AI-assisted quality inspection, 
-            and roll dispatch on <strong>one synchronized database</strong> for Everest Textile Mills.
-          </p>
-
-          <div className="mt-9 flex flex-wrap items-center justify-center gap-4">
-            <button
-              onClick={() => nav('/login')}
-              className="flex items-center gap-2 rounded-xl bg-indigo-loom px-6 py-3.5 text-[15.5px] font-semibold text-white shadow-lg shadow-indigo-loom/20 hover:bg-indigo-deep transition-all transform active:scale-[0.98]"
-            >
-              <span>Explore With Demo Accounts</span>
-              <ArrowRight className="size-4 text-[#2BB3A3]" />
-            </button>
-            <a
-              href="#workflow"
-              className="flex items-center gap-2 rounded-xl border border-line-strong bg-white px-6 py-3.5 text-[15.5px] font-semibold text-ink-2 shadow-sm hover:bg-sunk/60 transition-all"
-            >
-              <span>See Day-at-the-Mill Workflow</span>
-              <ChevronRight className="size-4" />
-            </a>
-          </div>
-
-          {/* Quick Stats banner */}
-          <div className="mt-16 grid grid-cols-2 gap-3 sm:grid-cols-4 max-w-4xl mx-auto">
-            {metrics.map((m) => (
-              <div key={m.label} className="rounded-xl border border-line bg-white/80 p-4 text-center shadow-xs">
-                <div className="font-display text-[26px] font-bold text-indigo-loom">{m.val}</div>
-                <div className="text-[13px] font-semibold text-ink">{m.label}</div>
-                <div className="text-[11.5px] text-ink-3 mt-0.5">{m.sub}</div>
-              </div>
-            ))}
-          </div>
-        </div>
+        </KineticGrid>
       </section>
 
       {/* ── Problem vs Solution (Everest Textile Mills Reality) ── */}

@@ -329,31 +329,27 @@ export default function KineticGrid({
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    const container = canvas.parentElement;
+    if (!container) return;
 
     const setSize = () => {
-      const parent = canvas.parentElement;
-      if (!parent) return;
-      const w = parent.clientWidth;
-      const h = parent.clientHeight;
+      const w = container.clientWidth;
+      const h = container.clientHeight;
       canvas.width = w;
       canvas.height = h;
       sizeRef.current = { w, h };
-      if (mouseRef.current.x === -9999) {
-        mouseRef.current = { x: -9999, y: -9999 };
-        targetMouseRef.current = { x: -9999, y: -9999 };
-      }
     };
 
     setSize();
     window.addEventListener("resize", setSize);
 
     const onMouseMove = (e: MouseEvent) => {
-      const rect = canvas.getBoundingClientRect();
+      const rect = container.getBoundingClientRect();
       targetMouseRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     };
 
     const onClick = (e: MouseEvent) => {
-      const rect = canvas.getBoundingClientRect();
+      const rect = container.getBoundingClientRect();
       ripplesRef.current.push({
         x: e.clientX - rect.left,
         y: e.clientY - rect.top,
@@ -363,14 +359,14 @@ export default function KineticGrid({
       });
     };
 
-    canvas.addEventListener("mousemove", onMouseMove);
-    canvas.addEventListener("click", onClick);
+    container.addEventListener("mousemove", onMouseMove);
+    container.addEventListener("click", onClick);
     rafRef.current = requestAnimationFrame(animate);
 
     return () => {
       window.removeEventListener("resize", setSize);
-      canvas.removeEventListener("mousemove", onMouseMove);
-      canvas.removeEventListener("click", onClick);
+      container.removeEventListener("mousemove", onMouseMove);
+      container.removeEventListener("click", onClick);
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
       }
@@ -382,17 +378,17 @@ export default function KineticGrid({
   return (
     <div
       className={cn(
-        "relative w-full h-full overflow-hidden",
+        "relative w-full overflow-hidden",
         globalColor === "monochrome" ? "bg-[#000000]" : "bg-[#161618]",
         className,
       )}
     >
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 w-full h-full z-0 pointer-events-auto"
+        className="absolute inset-0 w-full h-full z-0 pointer-events-none"
       />
 
-      <div className="relative z-10 w-full h-full pointer-events-none">{children}</div>
+      <div className="relative z-10 w-full pointer-events-auto">{children}</div>
     </div>
   );
 }
