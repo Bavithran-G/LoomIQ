@@ -5,6 +5,7 @@ cd "$(dirname "$0")/.."
 
 echo "==> Python dependencies"
 python3 -m pip install -q -r backend/requirements.txt
+
 if [ -z "${LOOMIQ_DATABASE_URL:-}" ]; then
   echo "==> PostgreSQL database 'loomiq' (user loomiq / password loomiq)"
   if command -v psql >/dev/null; then
