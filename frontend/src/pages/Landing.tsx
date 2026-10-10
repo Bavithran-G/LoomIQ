@@ -117,41 +117,36 @@ export default function Landing() {
         </div>
       </header>
 
-      {/* ── Hero Section ── */}
-      <section className="relative border-b border-line" style={{ minHeight: '92vh' }}>
-        <KineticGrid
-          className="min-h-[92vh]"
-          globalColor="default"
-        >
-          {/* Gradient overlay at bottom to blend into next section */}
-          <div className="absolute bottom-0 left-0 right-0 h-32 pointer-events-none bg-gradient-to-t from-black/40 to-transparent z-[5]" />
-
-          <div className="relative flex flex-col items-center justify-center min-h-[92vh] px-4 sm:px-6 lg:px-8 text-center">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3.5 py-1 text-[13px] font-medium text-white/80 mb-6 backdrop-blur-sm">
+      {/* ── Main Content Wrapped in Kinetic Grid ── */}
+      <KineticGrid globalColor="light" className="w-full">
+        {/* ── Hero Section ── */}
+        <section className="relative border-b border-line/50 min-h-[92vh] flex flex-col justify-center">
+          <div className="relative flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8 text-center pt-16 pb-20">
+            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-mist/30 bg-white/50 backdrop-blur-md px-3.5 py-1 text-[13px] font-medium text-indigo-loom mb-6">
               <Sparkles className="size-3.5 text-[#2BB3A3]" />
               <span>Built for Odoo Hackathon · Replacing Notebooks &amp; Phone Calls</span>
             </div>
 
-            <h1 className="mx-auto max-w-4xl font-display text-[42px] leading-[1.08] font-bold text-white sm:text-[56px] lg:text-[64px] drop-shadow-lg">
+            <h1 className="mx-auto max-w-4xl font-display text-[42px] leading-[1.08] font-bold text-indigo-loom sm:text-[56px] lg:text-[64px]">
               The Digital Backbone of a Busy Fabric Factory
             </h1>
 
-            <p className="mx-auto mt-6 max-w-2xl text-[17px] leading-relaxed text-white/70 sm:text-[19px]">
+            <p className="mx-auto mt-6 max-w-2xl text-[17px] leading-relaxed text-ink-2 sm:text-[19px]">
               LoomIQ unifies yarn procurement, loom floor scheduling, AI-assisted quality inspection,{' '}
-              and roll dispatch on <strong className="text-white">one synchronized database</strong> for Everest Textile Mills.
+              and roll dispatch on <strong>one synchronized database</strong> for Everest Textile Mills.
             </p>
 
             <div className="mt-9 flex flex-wrap items-center justify-center gap-4" style={{ pointerEvents: 'auto' }}>
               <button
                 onClick={() => nav('/login')}
-                className="flex items-center gap-2 rounded-xl bg-[#4a9eff] px-6 py-3.5 text-[15.5px] font-semibold text-white shadow-lg shadow-[#4a9eff]/30 hover:bg-[#3a8aee] transition-all transform active:scale-[0.98]"
+                className="flex items-center gap-2 rounded-xl bg-indigo-loom px-6 py-3.5 text-[15.5px] font-semibold text-white shadow-lg shadow-indigo-loom/20 hover:bg-indigo-deep transition-all transform active:scale-[0.98]"
               >
                 <span>Explore With Demo Accounts</span>
                 <ArrowRight className="size-4 text-[#2BB3A3]" />
               </button>
               <a
                 href="#workflow"
-                className="flex items-center gap-2 rounded-xl border border-white/25 bg-white/10 backdrop-blur-sm px-6 py-3.5 text-[15.5px] font-semibold text-white shadow-sm hover:bg-white/20 transition-all"
+                className="flex items-center gap-2 rounded-xl border border-line-strong bg-white/80 backdrop-blur-sm px-6 py-3.5 text-[15.5px] font-semibold text-ink-2 shadow-sm hover:bg-white transition-all"
               >
                 <span>See Day-at-the-Mill Workflow</span>
                 <ChevronRight className="size-4" />
@@ -161,19 +156,18 @@ export default function Landing() {
             {/* Quick Stats banner */}
             <div className="mt-16 grid grid-cols-2 gap-3 sm:grid-cols-4 max-w-4xl mx-auto" style={{ pointerEvents: 'auto' }}>
               {metrics.map((m) => (
-                <div key={m.label} className="rounded-xl border border-white/15 bg-white/10 backdrop-blur-md p-4 text-center shadow-xs">
-                  <div className="font-display text-[26px] font-bold text-[#4a9eff]">{m.val}</div>
-                  <div className="text-[13px] font-semibold text-white">{m.label}</div>
-                  <div className="text-[11.5px] text-white/50 mt-0.5">{m.sub}</div>
+                <div key={m.label} className="rounded-xl border border-line/50 bg-white/70 backdrop-blur-md p-4 text-center shadow-sm">
+                  <div className="font-display text-[26px] font-bold text-indigo-loom">{m.val}</div>
+                  <div className="text-[13px] font-semibold text-ink">{m.label}</div>
+                  <div className="text-[11.5px] text-ink-3 mt-0.5">{m.sub}</div>
                 </div>
               ))}
             </div>
           </div>
-        </KineticGrid>
-      </section>
+        </section>
 
       {/* ── Problem vs Solution (Everest Textile Mills Reality) ── */}
-      <section className="py-20 lg:py-28 bg-white border-b border-line">
+      <section className="py-20 lg:py-28 bg-transparent border-b border-line/50">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto mb-14">
             <h2 className="text-[32px] sm:text-[40px] font-bold text-indigo-loom">
@@ -184,9 +178,9 @@ export default function Landing() {
             </p>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto" style={{ pointerEvents: 'auto' }}>
             {comparisons.map((item, idx) => (
-              <div key={idx} className="flex flex-col justify-between rounded-xl border border-line bg-page p-5 shadow-xs">
+              <div key={idx} className="flex flex-col justify-between rounded-xl border border-line/60 bg-white/80 backdrop-blur-md p-5 shadow-sm">
                 <div className="mb-4">
                   <div className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider text-bad">
                     <span className="size-2 rounded-full bg-bad"></span>
@@ -210,7 +204,7 @@ export default function Landing() {
             ))}
 
             {/* Callout box */}
-            <div className="rounded-xl border border-indigo-loom/20 bg-indigo-loom p-6 text-white flex flex-col justify-between">
+            <div className="rounded-xl border border-indigo-loom/20 bg-indigo-loom/95 backdrop-blur-md p-6 text-white flex flex-col justify-between shadow-lg">
               <div>
                 <span className="inline-block rounded-md bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-[#2BB3A3]">
                   Unified Database
@@ -233,7 +227,7 @@ export default function Landing() {
       </section>
 
       {/* ── Workflow Journey ── */}
-      <section id="workflow" className="py-20 lg:py-28 bg-[#f5f7fa] border-b border-line">
+      <section id="workflow" className="py-20 lg:py-28 bg-transparent border-b border-line/50">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto mb-16">
             <span className="rounded-full bg-indigo-mist/20 px-3 py-1 text-[12px] font-semibold text-indigo-loom">
@@ -247,9 +241,9 @@ export default function Landing() {
             </p>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4" style={{ pointerEvents: 'auto' }}>
             {workflowSteps.map((st) => (
-              <div key={st.step} className="relative rounded-2xl border border-line bg-white p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+              <div key={st.step} className="relative rounded-2xl border border-line/60 bg-white/80 backdrop-blur-md p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <span className="font-display text-[26px] font-bold text-indigo-loom/25">{st.step}</span>
@@ -270,7 +264,7 @@ export default function Landing() {
       </section>
 
       {/* ── Role Based Operations ── */}
-      <section className="py-20 lg:py-28 bg-white border-b border-line">
+      <section className="py-20 lg:py-28 bg-transparent border-b border-line/50">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto mb-14">
             <h2 className="text-[32px] sm:text-[40px] font-bold text-indigo-loom">
@@ -281,7 +275,7 @@ export default function Landing() {
             </p>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 max-w-5xl mx-auto">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 max-w-5xl mx-auto" style={{ pointerEvents: 'auto' }}>
             {[
               {
                 role: 'Production Manager',
@@ -320,7 +314,7 @@ export default function Landing() {
                 color: 'border-l-indigo-600',
               },
             ].map((r) => (
-              <div key={r.role} className={`rounded-xl border border-line bg-page p-5 border-l-4 ${r.color} shadow-xs`}>
+              <div key={r.role} className={`rounded-xl border border-line/60 bg-white/80 backdrop-blur-md p-5 border-l-4 ${r.color} shadow-sm`}>
                 <div className="flex items-center justify-between">
                   <h3 className="font-display text-[17px] font-bold text-indigo-loom">{r.role}</h3>
                   <code className="text-[12px] bg-white border border-line px-1.5 py-0.5 rounded text-ink-3">
@@ -332,7 +326,7 @@ export default function Landing() {
             ))}
           </div>
 
-          <div className="mt-12 text-center">
+          <div className="mt-12 text-center" style={{ pointerEvents: 'auto' }}>
             <button
               onClick={() => nav('/login')}
               className="inline-flex items-center gap-2 rounded-xl bg-indigo-loom px-7 py-3.5 text-[15px] font-semibold text-white shadow-md hover:bg-indigo-deep transition-all"
@@ -343,6 +337,7 @@ export default function Landing() {
           </div>
         </div>
       </section>
+      </KineticGrid>
 
       {/* ── Footer ── */}
       <footer className="bg-indigo-loom text-white py-12">
