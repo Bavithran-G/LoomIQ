@@ -6,7 +6,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 DATABASE_URL = os.getenv(
     "LOOMIQ_DATABASE_URL",
-    "postgresql+psycopg://loomiq:loomiq@localhost:5432/loomiq",
+    f"sqlite:///{BASE_DIR / 'loomiq.db'}",
 )
 # Secret for signing JWTs. MUST be overridden in any shared deployment.
 SECRET_KEY = os.getenv("LOOMIQ_SECRET_KEY", "dev-only-change-me-loomiq-secret")

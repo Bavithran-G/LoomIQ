@@ -115,13 +115,20 @@ cd backend
 pip install -r requirements.txt
 ```
 
-Configure the database URL using your local environment or `.env` file:
+Local development uses `backend/loomiq.db` by default, so PostgreSQL is not
+required. To use PostgreSQL instead, set `LOOMIQ_DATABASE_URL` before running
+the seed command and backend:
 
 ```dotenv
 LOOMIQ_DATABASE_URL=postgresql+psycopg://loomiq:loomiq@localhost:5432/loomiq
 ```
 
-Make sure the PostgreSQL database and user exist before running the application.
+Make sure the PostgreSQL server, database and user exist before selecting this
+option. In PowerShell, set the variable for the current terminal with:
+
+```powershell
+$env:LOOMIQ_DATABASE_URL = "postgresql+psycopg://loomiq:loomiq@localhost:5432/loomiq"
+```
 
 Generate demo data and apply migrations:
 
