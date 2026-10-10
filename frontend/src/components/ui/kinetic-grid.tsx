@@ -26,7 +26,6 @@ const MAX_WARP = 24;
 const DOT_SPACING = 28;
 const LERP_SPEED = 0.08;
 
-const LINE_BASE = { r: 255, g: 255, b: 255, a: 0.13 };
 const NODE_BASE_RADIUS = 1.8;
 const NODE_ACTIVE_RADIUS = 3.2;
 
@@ -57,7 +56,7 @@ export default function KineticGrid({
 }: {
   children?: ReactNode;
   className?: string;
-  globalColor?: "default" | "monochrome";
+  globalColor?: "default" | "monochrome" | "light";
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -155,17 +154,30 @@ export default function KineticGrid({
       const theme = {
         default: {
           bg: "#161618",
+          lineBase: { r: 255, g: 255, b: 255, a: 0.13 },
           lineActive: { r: 74, g: 158, b: 255, a: 0.9 },
+          nodeBase: { r: 255, g: 255, b: 255, a: 0.2 },
           nodeActive: { r: 74, g: 158, b: 255, a: 1.0 },
           glow: "74,158,255",
           ripple: "100,180,255",
         },
         monochrome: {
           bg: "#000000",
+          lineBase: { r: 255, g: 255, b: 255, a: 0.13 },
           lineActive: { r: 255, g: 255, b: 255, a: 0.9 },
+          nodeBase: { r: 255, g: 255, b: 255, a: 0.2 },
           nodeActive: { r: 255, g: 255, b: 255, a: 1.0 },
           glow: "255,255,255",
           ripple: "255,255,255",
+        },
+        light: {
+          bg: "transparent", // Use transparent so page background shows through
+          lineBase: { r: 15, g: 23, b: 42, a: 0.22 },
+          lineActive: { r: 15, g: 23, b: 42, a: 0.35 },
+          nodeBase: { r: 15, g: 23, b: 42, a: 0.3 },
+          nodeActive: { r: 15, g: 23, b: 42, a: 0.55 },
+          glow: "15,23,42",
+          ripple: "37,99,235", // blue-600
         },
       }[globalColor ?? "default"];
 
@@ -176,7 +188,7 @@ export default function KineticGrid({
       ctx.fillRect(0, 0, W, H);
 
       // Static background dot texture
-      ctx.fillStyle = "rgba(255,255,255,0.05)";
+      ctx.fillStyle = globalColor === "light" ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.05)";
       for (let x = DOT_SPACING / 2; x < W; x += DOT_SPACING) {
         for (let y = DOT_SPACING / 2; y < H; y += DOT_SPACING) {
           ctx.beginPath();
@@ -230,7 +242,7 @@ export default function KineticGrid({
         ctx.beginPath();
         ctx.moveTo(p1.x, p1.y);
         ctx.lineTo(p2.x, p2.y);
-        ctx.strokeStyle = lerpColor(LINE_BASE, theme.lineActive, t);
+        ctx.strokeStyle = lerpColor(theme.lineBase, theme.lineActive, t);
         ctx.lineWidth = lerpN(0.8, 1.5, t);
         ctx.stroke();
       };
@@ -286,7 +298,7 @@ export default function KineticGrid({
           ctx.beginPath();
           ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
           ctx.fillStyle = lerpColor(
-            { r: 255, g: 255, b: 255, a: 0.2 },
+            theme.nodeBase,
             theme.nodeActive,
             t,
           );
@@ -379,7 +391,7 @@ export default function KineticGrid({
     <div
       className={cn(
         "relative w-full overflow-hidden",
-        globalColor === "monochrome" ? "bg-[#000000]" : "bg-[#161618]",
+        globalColor === "monochrome" ? "bg-[#000000]" : globalColor === "light" ? "bg-transparent" : "bg-[#161618]",
         className,
       )}
     >

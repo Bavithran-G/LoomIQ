@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { Button, Field, Input, Notice } from '../components/ui'
+import KineticGrid from '../components/ui/kinetic-grid'
 import { Wordmark } from '../components/brand'
 import { ROLES } from '../lib/format'
 import { api } from '../lib/api'
@@ -171,9 +172,9 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f7fa] flex flex-col justify-between">
+    <KineticGrid globalColor="light" className="min-h-screen flex flex-col justify-between">
       {/* ── Top Bar ── */}
-      <header className="border-b border-line bg-white px-4 sm:px-6 py-3 flex items-center justify-between">
+      <header className="border-b border-line/50 bg-white/90 backdrop-blur-md px-4 sm:px-6 py-3 flex items-center justify-between relative z-10">
         <div className="flex items-center gap-4">
           <Link to="/" className="flex items-center gap-1.5 text-ink-3 hover:text-indigo-loom text-[13.5px] font-medium transition-colors">
             <ArrowLeft className="size-4" />
@@ -186,18 +187,18 @@ export default function Login() {
       </header>
 
       {/* ── Main Login Layout ── */}
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-8 sm:py-12 grid gap-8 lg:grid-cols-[420px_1fr] items-start">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-8 sm:py-12 grid gap-8 lg:grid-cols-[420px_1fr] items-start relative z-10" style={{ pointerEvents: 'auto' }}>
         {/* Form Card (Sign In / Register) */}
-        <div className="rounded-2xl border border-line bg-white shadow-sm overflow-hidden">
+        <div className="rounded-2xl border border-line/50 bg-white/80 backdrop-blur-md shadow-sm overflow-hidden">
           {/* Tabs */}
-          <div className="flex border-b border-line bg-[#fbfcfd]">
+          <div className="flex border-b border-line/50 bg-white/40">
             {(['signin', 'register'] as Tab[]).map((t) => (
               <button
                 key={t}
                 onClick={() => { setTab(t); setErr(null); setRErr(null); setROk(false) }}
                 className={`flex-1 py-3.5 text-[14px] font-semibold transition-colors ${
                   tab === t
-                    ? 'text-indigo-loom border-b-2 border-indigo-loom bg-white'
+                    ? 'text-indigo-loom border-b-2 border-indigo-loom bg-white/60'
                     : 'text-ink-3 hover:text-ink'
                 }`}
               >
@@ -318,8 +319,8 @@ export default function Login() {
 
         {/* ── Demo Accounts Explorer (Persona Guide) ── */}
         <div className="space-y-6">
-          <div className="rounded-2xl border border-line bg-white p-6 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-4 mb-5">
+          <div className="rounded-2xl border border-line/50 bg-white/80 backdrop-blur-md p-6 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line/50 pb-4 mb-5">
               <div>
                 <h2 className="text-[18px] font-bold text-indigo-loom flex items-center gap-2">
                   <UserCheck className="size-5 text-[#2BB3A3]" />
@@ -350,7 +351,7 @@ export default function Login() {
                           setP('loomiq@2026')
                           submit(acc.username, 'loomiq@2026')
                         }}
-                        className="group flex flex-col justify-between text-left rounded-xl border border-line bg-page hover:bg-white hover:border-indigo-loom/40 hover:shadow-md transition-all p-3.5"
+                        className="group flex flex-col justify-between text-left rounded-xl border border-line/60 bg-white/50 hover:bg-white/90 hover:border-indigo-loom/40 hover:shadow-md transition-all p-3.5"
                       >
                         <div>
                           <div className="flex items-center justify-between gap-1 mb-1">
@@ -384,9 +385,9 @@ export default function Login() {
       </main>
 
       {/* ── Footer ── */}
-      <footer className="border-t border-line bg-white py-4 px-6 text-center text-[12.5px] text-ink-3">
+      <footer className="border-t border-line/50 bg-white/80 backdrop-blur-md py-4 px-6 text-center text-[12.5px] text-ink-3 relative z-10">
         LoomIQ · Everest Textile Mills Operating System · Odoo NMIT Hackathon 2026
       </footer>
-    </div>
+    </KineticGrid>
   )
 }
