@@ -137,7 +137,7 @@ export default function Login() {
     setBusy(true)
     try {
       const user = await login(username.trim().toLowerCase(), password)
-      nav(user.role === 'buyer' ? '/portal' : '/', { replace: true })
+      nav(user.role === 'buyer' ? '/portal' : '/app', { replace: true })
     } catch (e) { setErr((e as Error).message) } finally { setBusy(false) }
   }
 
@@ -152,11 +152,22 @@ export default function Login() {
     try {
       await api('/api/auth/register', {
         method: 'POST',
-        body: JSON.stringify({ full_name: rName.trim(), username: rUser.trim().toLowerCase(), password: rPass, role: rRole }),
+        body: {
+          full_name: rName.trim(),
+          username: rUser.trim().toLowerCase(),
+          password: rPass,
+          role: rRole,
+        },
         auth: false,
       })
-      setROk(true)
-    } catch (e) { setRErr((e as Error).message) } finally { setRBusy(false) }
+      // Immediately log the user in with their new credentials
+      const user = await login(rUser.trim().toLowerCase(), rPass)
+      nav(user.role === 'buyer' ? '/portal' : '/app', { replace: true })
+    } catch (e) {
+      setRErr((e as Error).message)
+    } finally {
+      setRBusy(false)
+    }
   }
 
   return (
