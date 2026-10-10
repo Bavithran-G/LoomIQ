@@ -4,10 +4,15 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-DATABASE_URL = os.getenv(
-    "LOOMIQ_DATABASE_URL",
-    "postgresql+psycopg://loomiq:loomiq@localhost:5432/loomiq",
-)
+try:
+    from dotenv import load_dotenv
+    load_dotenv(BASE_DIR / ".env")
+    load_dotenv(BASE_DIR.parent / ".env")
+except ImportError:
+    pass
+
+_default_db = f"sqlite:///{(BASE_DIR / 'loomiq.db').as_posix()}"
+DATABASE_URL = os.getenv("LOOMIQ_DATABASE_URL", _default_db)
 # Secret for signing JWTs. MUST be overridden in any shared deployment.
 SECRET_KEY = os.getenv("LOOMIQ_SECRET_KEY", "dev-only-change-me-loomiq-secret")
 ACCESS_TOKEN_MINUTES = int(os.getenv("LOOMIQ_TOKEN_MINUTES", "720"))
