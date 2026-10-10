@@ -6,7 +6,3 @@ node_modules/
 frontend/dist/
 .env
 *.db
-.agents/
-.gemini/
-*.log
-backend/check_db.py

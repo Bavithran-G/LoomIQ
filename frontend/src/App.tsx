@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useAuth } from './lib/auth'
 import { Shell } from './components/Shell'
 import { Empty, LoadingBlock } from './components/ui'
+import Landing from './pages/Landing'
 import Login from './pages/Login'
 import PublicRoll from './pages/PublicRoll'
 
@@ -31,17 +32,34 @@ function Guard({ perm, children }: { perm: string; children: ReactNode }) {
 export default function App() {
   const { user, ready } = useAuth()
   const loc = useLocation()
+
   if (loc.pathname.startsWith('/r/') && !user && ready) {
     return <Routes><Route path="/r/:rollNo" element={<PublicRoll />} /></Routes>
   }
+
   if (!ready) return <LoadingBlock rows={6} />
-  if (!user) return <Login />
-  const home = user.role === 'buyer' ? '/portal' : '/'
+
+  // If user is not logged in:
+  if (!user) {
+    return (
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    )
+  }
+
+  // If user is logged in, redirect /login to app home:
+  const home = user.role === 'buyer' ? '/portal' : '/app'
+
   return (
     <Shell>
       <Suspense fallback={<LoadingBlock rows={8} />}>
         <Routes>
-          <Route path="/" element={user.role === 'buyer' ? <Navigate to="/portal" replace /> : <Guard perm="dashboard.view"><Overview /></Guard>} />
+          <Route path="/" element={<Navigate to={home} replace />} />
+          <Route path="/login" element={<Navigate to={home} replace />} />
+          <Route path="/app" element={user.role === 'buyer' ? <Navigate to="/portal" replace /> : <Guard perm="dashboard.view"><Overview /></Guard>} />
           <Route path="/orders" element={<Guard perm="orders.view"><Orders /></Guard>} />
           <Route path="/orders/:id" element={<Guard perm="orders.view"><OrderDetail /></Guard>} />
           <Route path="/inventory" element={<Guard perm="inventory.view"><Inventory /></Guard>} />

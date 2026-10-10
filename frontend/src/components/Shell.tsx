@@ -12,19 +12,30 @@ import { ROLES, ago } from '../lib/format'
 import { Wordmark } from './brand'
 
 export const NAV = [
-  { to: '/', label: 'Overview', icon: Gauge, perm: 'dashboard.view' },
-  { to: '/orders', label: 'Sales orders', icon: ClipboardList, perm: 'orders.view' },
+  { to: '/app', label: 'Command Centre', icon: Gauge, perm: 'dashboard.view' },
+  { to: '/orders', label: 'Sales Orders', icon: ClipboardList, perm: 'orders.view' },
   { to: '/inventory', label: 'Inventory', icon: Boxes, perm: 'inventory.view' },
-  { to: '/production', label: 'Production planning', icon: Factory, perm: 'production.view' },
-  { to: '/machines', label: 'Machine monitoring', icon: Cog, perm: 'production.view' },
-  { to: '/quality', label: 'AI quality inspection', icon: ScanSearch, perm: 'quality.view' },
-  { to: '/rolls', label: 'Roll traceability', icon: QrCode, perm: 'rolls.view' },
+  { to: '/production', label: 'Production Planning', icon: Factory, perm: 'production.view' },
+  { to: '/machines', label: 'Machine Monitoring', icon: Cog, perm: 'production.view' },
+  { to: '/quality', label: 'Quality Inspection', icon: ScanSearch, perm: 'quality.view' },
+  { to: '/rolls', label: 'Roll Traceability', icon: QrCode, perm: 'rolls.view' },
   { to: '/dispatch', label: 'Dispatch', icon: Truck, perm: 'dispatch.view' },
-  { to: '/cost', label: 'Cost intelligence', icon: IndianRupee, perm: 'cost.view' },
-  { to: '/insights', label: 'Insights & reports', icon: LineChart, perm: 'insights.view' },
-  { to: '/portal', label: 'Buyer portal', icon: Users, perm: 'portal.view' },
+  { to: '/cost', label: 'Cost Intelligence', icon: IndianRupee, perm: 'cost.view' },
+  { to: '/insights', label: 'Insights & Reports', icon: LineChart, perm: 'insights.view' },
+  { to: '/portal', label: 'Buyer Portal', icon: Users, perm: 'portal.view' },
   { to: '/admin', label: 'Administration', icon: ShieldCheck, perm: 'admin.manage' },
 ]
+
+/** Modules each role primarily uses — shown as role-specific welcome tiles. */
+export const ROLE_MODULES: Record<string, string[]> = {
+  admin: ['Command Centre', 'Sales Orders', 'Inventory', 'Production Planning', 'Quality Inspection', 'Dispatch', 'Cost Intelligence', 'Administration'],
+  production_manager: ['Command Centre', 'Sales Orders', 'Production Planning', 'Machine Monitoring', 'Quality Inspection', 'Roll Traceability', 'Insights & Reports'],
+  storekeeper: ['Inventory', 'Sales Orders', 'Roll Traceability', 'Production Planning'],
+  quality_inspector: ['Quality Inspection', 'Roll Traceability', 'Sales Orders'],
+  dispatch_operator: ['Dispatch', 'Roll Traceability', 'Sales Orders'],
+  finance: ['Cost Intelligence', 'Insights & Reports', 'Sales Orders', 'Command Centre'],
+  buyer: ['Buyer Portal'],
+}
 
 type Ev = { id: number; message: string; severity: string; at: string; order_id: number | null }
 

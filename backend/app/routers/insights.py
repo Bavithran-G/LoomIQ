@@ -20,6 +20,14 @@ router = APIRouter(prefix="/api", tags=["insights"])
 
 
 # ---------------- auth ----------------
+class RegisterIn(BaseModel):
+    full_name: str = Field(min_length=2, max_length=120)
+    username: str = Field(min_length=2, max_length=64, pattern=r"^[a-z0-9._-]+$")
+    password: str = Field(min_length=8, max_length=128)
+    role: str = Field(default="storekeeper",
+                      pattern="^(production_manager|storekeeper|quality_inspector|dispatch_operator|finance|buyer)$")
+
+
 @router.post("/auth/login")
 def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     u = db.scalar(select(User).where(User.username == form.username.strip().lower()))
@@ -29,9 +37,31 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
             "permissions": permissions_for(u.role)}
 
 
+@router.post("/auth/register", status_code=201)
+def register(body: RegisterIn, db: Session = Depends(get_db)):
+    """Self-registration — account is created as inactive (pending admin activation)."""
+    if db.scalar(select(User.id).where(User.username == body.username)):
+        raise BusinessError("Username already taken. Please choose a different one.", 409, "username_taken")
+    role_map = {r.value: r for r in Role}
+    role_enum = role_map.get(body.role)
+    if role_enum is None:
+        raise BusinessError("Invalid role selected.", 422, "invalid_role")
+    new_user = User(
+        username=body.username,
+        full_name=body.full_name,
+        password_hash=hash_password(body.password),
+        role=role_enum,
+        is_active=False,   # admin must activate via Admin panel
+    )
+    db.add(new_user)
+    db.commit()
+    return {"message": "Account created. An administrator will activate your account.", "username": body.username}
+
+
 @router.get("/auth/me")
 def me(user: User = Depends(current_user)):
     return {"user": user_out(user), "permissions": permissions_for(user.role)}
+
 
 
 # ---------------- dashboard ----------------

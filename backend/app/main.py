@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from . import config
-from .routers import finance, insights, operations, orders, quality
+from .routers import insights, operations, orders, quality
 from .services.core import BusinessError
 
 app = FastAPI(
@@ -26,7 +26,7 @@ async def value_error(_: Request, exc: ValueError):
     return JSONResponse(status_code=422, content={"detail": str(exc), "code": "invalid_value"})
 
 
-for r in (insights.router, orders.router, operations.router, quality.router, finance.router):
+for r in (insights.router, orders.router, operations.router, quality.router):
     app.include_router(r)
 
 

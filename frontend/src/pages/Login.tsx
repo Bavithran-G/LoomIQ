@@ -1,35 +1,139 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { Button, Field, Input, Notice } from '../components/ui'
 import { Wordmark } from '../components/brand'
 import { ROLES } from '../lib/format'
-import KineticGrid from '../components/ui/kinetic-grid'
+import { api } from '../lib/api'
+import {
+  CheckCircle,
+  Factory,
+  ShieldCheck,
+  TrendingUp,
+  Truck,
+  Package,
+  ArrowLeft,
+  Sparkles,
+  Info,
+  UserCheck,
+  Layers,
+  ChevronRight
+} from 'lucide-react'
 
-/* ─── Demo accounts ─────────────────────────────────────────── */
-const DEMO = [
-  ['admin', 'admin'],
-  ['pm.ravi', 'production_manager'],
-  ['store.meena', 'storekeeper'],
-  ['qc.anitha', 'quality_inspector'],
-  ['dispatch.karthik', 'dispatch_operator'],
-  ['finance.priya', 'finance'],
-  ['buyer.cae', 'buyer'],
-  ['buyer.nhl', 'buyer'],
+// Demo accounts organized by Mill Department with quick role context
+const DEMO_PERSONAS = [
+  {
+    category: 'Factory Floor & Operations',
+    accounts: [
+      {
+        label: 'Ravi Shankar',
+        username: 'pm.ravi',
+        role: 'production_manager',
+        title: 'Production Manager',
+        badge: 'Floor & Looms',
+        desc: 'Monitors machine states, schedules weaving jobs, reviews downtime, tracks order risks.',
+      },
+      {
+        label: 'Meena Kumari',
+        username: 'store.meena',
+        role: 'storekeeper',
+        title: 'Storekeeper',
+        badge: 'Yarn Store',
+        desc: 'Receives yarn from trucks, tracks lots, FIFO reservations, low-stock warnings.',
+      },
+      {
+        label: 'Anitha Selvam',
+        username: 'qc.anitha',
+        role: 'quality_inspector',
+        title: 'Quality Inspector',
+        badge: 'Fabric QC',
+        desc: 'Assisted defect scanning, roll grading (pass/fail/rework), QR passport printing.',
+      },
+      {
+        label: 'Karthik Raja',
+        username: 'dispatch.karthik',
+        role: 'dispatch_operator',
+        title: 'Dispatch Operator',
+        badge: 'Logistics',
+        desc: 'Verifies rolls onto delivery trucks, packing lists, vehicle manifests.',
+      },
+    ],
+  },
+  {
+    category: 'Management & External Stakeholders',
+    accounts: [
+      {
+        label: 'Asha Raman',
+        username: 'admin',
+        role: 'admin',
+        title: 'System Administrator',
+        badge: 'Full Access',
+        desc: 'User management, configuration, security and master mill settings.',
+      },
+      {
+        label: 'Priya Natarajan',
+        username: 'finance.priya',
+        role: 'finance',
+        title: 'Finance & Management',
+        badge: 'Costing & P&L',
+        desc: 'Month-end costing, actual vs estimated cost per metre, what-if simulator.',
+      },
+      {
+        label: 'Coimbatore Apparel',
+        username: 'buyer.cae',
+        role: 'buyer',
+        title: 'Garment Buyer',
+        badge: 'Buyer Portal',
+        desc: 'Real-time order progress (weaving/inspection/dispatch) without internal cost data.',
+      },
+      {
+        label: 'Nordic Home Linens',
+        username: 'buyer.nhl',
+        role: 'buyer',
+        title: 'Home Textile Buyer',
+        badge: 'Buyer Portal',
+        desc: 'Accesses packing lists, released roll certificates, and delivery milestones.',
+      },
+    ],
+  },
 ]
 
-/* ─── Main page ─────────────────────────────────────────────── */
+const ROLE_COLORS: Record<string, string> = {
+  admin: 'bg-purple-50 text-purple-700 border-purple-200',
+  production_manager: 'bg-blue-50 text-blue-700 border-blue-200',
+  storekeeper: 'bg-amber-50 text-amber-700 border-amber-200',
+  quality_inspector: 'bg-teal-50 text-teal-700 border-teal-200',
+  dispatch_operator: 'bg-orange-50 text-orange-700 border-orange-200',
+  finance: 'bg-green-50 text-green-700 border-green-200',
+  buyer: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+}
+
+type Tab = 'signin' | 'register'
+
 export default function Login() {
   const { login } = useAuth()
   const nav = useNavigate()
+  const [tab, setTab] = useState<Tab>('signin')
+
+  // sign-in state
   const [u, setU] = useState('')
   const [p, setP] = useState('')
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
+  // register state
+  const [rName, setRName] = useState('')
+  const [rUser, setRUser] = useState('')
+  const [rPass, setRPass] = useState('')
+  const [rPass2, setRPass2] = useState('')
+  const [rRole, setRRole] = useState('storekeeper')
+  const [rErr, setRErr] = useState<string | null>(null)
+  const [rOk, setROk] = useState(false)
+  const [rBusy, setRBusy] = useState(false)
+
   const submit = async (username = u, password = p) => {
     setErr(null)
-    if (!username || !password) { setErr('Enter your username and password.'); return }
+    if (!username || !password) { setErr('Please enter your username and password.'); return }
     setBusy(true)
     try {
       const user = await login(username.trim().toLowerCase(), password)
@@ -37,271 +141,241 @@ export default function Login() {
     } catch (e) { setErr((e as Error).message) } finally { setBusy(false) }
   }
 
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setRErr(null)
+    if (!rName.trim()) { setRErr('Full name is required.'); return }
+    if (!rUser.trim()) { setRErr('Username is required.'); return }
+    if (rPass.length < 8) { setRErr('Password must be at least 8 characters.'); return }
+    if (rPass !== rPass2) { setRErr('Passwords do not match.'); return }
+    setRBusy(true)
+    try {
+      await api('/api/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({ full_name: rName.trim(), username: rUser.trim().toLowerCase(), password: rPass, role: rRole }),
+        auth: false,
+      })
+      setROk(true)
+    } catch (e) { setRErr((e as Error).message) } finally { setRBusy(false) }
+  }
+
   return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap');
+    <div className="min-h-screen bg-[#f5f7fa] flex flex-col justify-between">
+      {/* ── Top Bar ── */}
+      <header className="border-b border-line bg-white px-4 sm:px-6 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Link to="/" className="flex items-center gap-1.5 text-ink-3 hover:text-indigo-loom text-[13.5px] font-medium transition-colors">
+            <ArrowLeft className="size-4" />
+            <span>Back to Overview</span>
+          </Link>
+          <span className="h-4 w-px bg-line" />
+          <Wordmark />
+        </div>
+        <span className="text-[12.5px] text-ink-3 hidden sm:inline">Everest Textile Mills · Secure Login</span>
+      </header>
 
-        .login-root {
-          display: grid;
-          grid-template-columns: 60% 40%;
-          min-height: 100vh;
-          width: 100%;
-          overflow: hidden;
-        }
-        .yarn-panel {
-          position: relative;
-          overflow: hidden;
-          min-width: 0;
-        }
-        .yarn-overlay {
-          position: absolute;
-          inset: 0;
-          background: radial-gradient(circle at 30% 50%, rgba(20,40,75,0.4) 0%, rgba(9,14,23,0.85) 100%);
-          pointer-events: none;
-          z-index: 1;
-        }
-        .yarn-content {
-          position: absolute;
-          inset: 0;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          padding: 3rem 4rem;
-          pointer-events: none;
-          z-index: 2;
-        }
-        .yarn-headline {
-          font-family: 'Manrope', sans-serif;
-          font-size: clamp(2.5rem, 4vw, 3.5rem);
-          font-weight: 800;
-          line-height: 1.05;
-          color: #ffffff;
-          max-width: 600px;
-          text-shadow: 0 4px 32px rgba(0,0,0,0.8);
-          letter-spacing: -0.02em;
-          margin-bottom: 1.25rem;
-        }
-        .yarn-sub {
-          font-family: 'Inter', sans-serif;
-          font-size: 1.1rem;
-          color: #a8bdd8;
-          max-width: 500px;
-          line-height: 1.6;
-          text-shadow: 0 2px 12px rgba(0,0,0,0.6);
-        }
-        .yarn-footer {
-          font-family: 'Inter', sans-serif;
-          font-size: 13px;
-          color: rgba(143,166,204,0.6);
-        }
-        .login-panel {
-          min-width: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 2rem 3rem;
-          background: #ffffff;
-          overflow-y: auto;
-          box-shadow: -20px 0 40px rgba(0,0,0,0.25);
-          z-index: 10;
-        }
-        .login-box {
-          width: 100%;
-          max-width: 380px;
-        }
-        
-        /* Typography Expansion on Hover */
-        .expand-on-hover {
-          transition: letter-spacing 0.3s ease, color 0.3s ease;
-        }
-        .expand-on-hover:hover {
-          letter-spacing: 0.05em;
-        }
+      {/* ── Main Login Layout ── */}
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-8 sm:py-12 grid gap-8 lg:grid-cols-[420px_1fr] items-start">
+        {/* Form Card (Sign In / Register) */}
+        <div className="rounded-2xl border border-line bg-white shadow-sm overflow-hidden">
+          {/* Tabs */}
+          <div className="flex border-b border-line bg-[#fbfcfd]">
+            {(['signin', 'register'] as Tab[]).map((t) => (
+              <button
+                key={t}
+                onClick={() => { setTab(t); setErr(null); setRErr(null); setROk(false) }}
+                className={`flex-1 py-3.5 text-[14px] font-semibold transition-colors ${
+                  tab === t
+                    ? 'text-indigo-loom border-b-2 border-indigo-loom bg-white'
+                    : 'text-ink-3 hover:text-ink'
+                }`}
+              >
+                {t === 'signin' ? 'Sign In' : 'Register Account'}
+              </button>
+            ))}
+          </div>
 
-        .login-title {
-          font-family: 'Manrope', sans-serif;
-          font-size: 32px;
-          font-weight: 800;
-          color: #13294b;
-          margin: 0 0 6px 0;
-          letter-spacing: -0.03em;
-        }
-        
-        .login-sub {
-          font-family: 'Inter', sans-serif;
-          font-size: 14.5px;
-          color: #6b7a8d;
-          margin: 0 0 2rem 0;
-        }
-        .login-form-area {
-          font-family: 'Inter', sans-serif;
-        }
-        .demo-box {
-          margin-top: 2rem;
-          border-radius: 12px;
-          border: 1px solid #e1e6ed;
-          background: #f8fafc;
-          padding: 16px;
-        }
-        .demo-label {
-          font-family: 'Inter', sans-serif;
-          font-size: 11.5px;
-          font-weight: 700;
-          color: #8fa6cc;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          margin-bottom: 12px;
-        }
-        .demo-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 6px;
-        }
-        .demo-btn {
-          background: #ffffff;
-          border: 1px solid #e1e6ed;
-          border-radius: 8px;
-          padding: 8px 10px;
-          text-align: left;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          font-family: 'Inter', sans-serif;
-        }
-        .demo-btn:hover { 
-          background: #f1f5f9; 
-          border-color: #cbd5e1;
-          transform: translateY(-1px);
-        }
-        
-        /* Expand letter spacing of demo button names on hover */
-        .demo-btn:hover .demo-btn-name {
-          letter-spacing: 0.03em;
-        }
+          <div className="p-6 sm:p-7">
+            {tab === 'signin' ? (
+              <>
+                <div className="mb-6">
+                  <h1 className="text-[22px] font-bold text-indigo-loom">Mill Access Portal</h1>
+                  <p className="mt-1 text-[13.5px] text-ink-3">
+                    Sign in with your staff account or click any role profile on the right to test instantly.
+                  </p>
+                </div>
 
-        .demo-btn-name {
-          display: block;
-          font-size: 13.5px;
-          font-weight: 600;
-          color: #1a2333;
-          transition: letter-spacing 0.3s ease;
-        }
-        .demo-btn-role {
-          display: block;
-          font-size: 11.5px;
-          color: #75808f;
-          margin-top: 2px;
-        }
-        .divider-line {
-          border: none;
-          border-top: 1px solid #e2e8f0;
-          margin: 2rem 0;
-        }
+                <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); submit() }}>
+                  <Field label="Username">
+                    {(id) => (
+                      <Input
+                        id={id}
+                        autoComplete="username"
+                        value={u}
+                        onChange={(e) => setU(e.target.value)}
+                        autoFocus
+                        placeholder="e.g. pm.ravi or admin"
+                      />
+                    )}
+                  </Field>
+                  <Field label="Password">
+                    {(id) => (
+                      <Input
+                        id={id}
+                        type="password"
+                        autoComplete="current-password"
+                        value={p}
+                        onChange={(e) => setP(e.target.value)}
+                        placeholder="••••••••"
+                      />
+                    )}
+                  </Field>
+                  {err && <Notice tone="bad">{err}</Notice>}
+                  <Button variant="primary" type="submit" loading={busy} className="w-full mt-2">
+                    Sign In
+                  </Button>
+                </form>
 
-        @media (max-width: 992px) {
-          .login-root {
-            grid-template-columns: 1fr;
-            grid-template-rows: 350px 1fr;
-          }
-          .yarn-panel { min-height: 350px; }
-          .yarn-headline { font-size: 2rem; }
-          .yarn-content { padding: 2rem; }
-          .login-panel { padding: 2rem; }
-        }
-      `}</style>
+                <div className="mt-5 rounded-lg border border-line bg-page p-3 text-[12.5px] text-ink-2 flex items-start gap-2">
+                  <Info className="size-4 text-indigo-loom shrink-0 mt-0.5" />
+                  <span>
+                    Judges / Evaluators: All demo accounts use default password <code className="bg-white border border-line px-1 rounded text-indigo-loom font-semibold">loomiq@2026</code>.
+                  </span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="mb-6">
+                  <h1 className="text-[22px] font-bold text-indigo-loom">Staff Registration</h1>
+                  <p className="mt-1 text-[13.5px] text-ink-3">
+                    Register a new worker or manager account for mill authorization.
+                  </p>
+                </div>
 
-      <div className="login-root">
-        {/* ── LEFT: 60% — Kinetic Grid Background ───────────────────── */}
-        <div className="yarn-panel">
-          <KineticGrid globalColor="default">
-            <div className="yarn-overlay" />
-            <div className="yarn-content">
-              <Wordmark light />
-              <div>
-                <h1 className="yarn-headline">
-                  Every roll traceable.<br />Every order visible.<br />Every decision informed.
-                </h1>
-                <p className="yarn-sub">
-                  One shared record from yarn receipt to dispatch — stock, looms,
-                  inspection, rolls and cost for Everest Textile Mills.
-                </p>
-              </div>
-              <p className="yarn-footer">
-                Machine status in this demo is derived from job records, not live sensors.
-              </p>
-            </div>
-          </KineticGrid>
+                {rOk ? (
+                  <div className="flex flex-col items-center gap-3 py-6 text-center">
+                    <CheckCircle className="size-12 text-ok" />
+                    <p className="text-[15px] font-bold text-ink">Account Registered Successfully!</p>
+                    <p className="text-[13px] text-ink-3 max-w-xs">
+                      For security, new registrations are set as inactive. Log in as <code className="font-semibold text-indigo-loom">admin</code> to activate it in Administration.
+                    </p>
+                    <Button variant="secondary" onClick={() => { setTab('signin'); setROk(false) }} className="mt-2">
+                      Go to Sign In
+                    </Button>
+                  </div>
+                ) : (
+                  <form className="space-y-4" onSubmit={handleRegister}>
+                    <Field label="Full Name">
+                      {(id) => <Input id={id} value={rName} onChange={(e) => setRName(e.target.value)} placeholder="e.g. Ramesh Kumar" autoFocus />}
+                    </Field>
+                    <Field label="Username">
+                      {(id) => <Input id={id} value={rUser} onChange={(e) => setRUser(e.target.value)} placeholder="e.g. ramesh.kumar" autoComplete="username" />}
+                    </Field>
+                    <Field label="Mill Role / Department">
+                      {(id) => (
+                        <select
+                          id={id}
+                          value={rRole}
+                          onChange={(e) => setRRole(e.target.value)}
+                          className="h-9 w-full rounded-md border border-line bg-surface px-3 text-[14px] focus:border-indigo-thread focus:outline-none"
+                        >
+                          <option value="storekeeper">Storekeeper (Yarn &amp; Stock)</option>
+                          <option value="production_manager">Production Manager (Looms &amp; Jobs)</option>
+                          <option value="quality_inspector">Quality Inspector (Fabric QC)</option>
+                          <option value="dispatch_operator">Dispatch Operator (Logistics)</option>
+                          <option value="finance">Finance &amp; Management</option>
+                          <option value="buyer">External Buyer</option>
+                        </select>
+                      )}
+                    </Field>
+                    <Field label="Password">
+                      {(id) => <Input id={id} type="password" value={rPass} onChange={(e) => setRPass(e.target.value)} placeholder="Min. 8 characters" autoComplete="new-password" />}
+                    </Field>
+                    <Field label="Confirm Password">
+                      {(id) => <Input id={id} type="password" value={rPass2} onChange={(e) => setRPass2(e.target.value)} placeholder="Re-enter password" autoComplete="new-password" />}
+                    </Field>
+                    {rErr && <Notice tone="bad">{rErr}</Notice>}
+                    <Button variant="primary" type="submit" loading={rBusy} className="w-full mt-2">
+                      Submit Registration
+                    </Button>
+                  </form>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
-        {/* ── RIGHT: 40% — Refined Login Form ──────────────────────── */}
-        <div className="login-panel">
-          <div className="login-box">
-            <div className="login-form-area">
-              <Wordmark className="mb-8 lg:hidden" />
-              <h2 className="login-title expand-on-hover">Sign in</h2>
-              <p className="login-sub expand-on-hover">Access your mill operations account.</p>
-
-              <form className="space-y-4.5" onSubmit={(e) => { e.preventDefault(); submit() }}>
-                <Field label="Username">
-                  {(id) => (
-                    <Input
-                      id={id}
-                      autoComplete="username"
-                      value={u}
-                      onChange={(e) => setU(e.target.value)}
-                      autoFocus
-                      style={{ fontFamily: 'Inter, sans-serif', height: 44 }}
-                    />
-                  )}
-                </Field>
-                <Field label="Password">
-                  {(id) => (
-                    <Input
-                      id={id}
-                      type="password"
-                      autoComplete="current-password"
-                      value={p}
-                      onChange={(e) => setP(e.target.value)}
-                      style={{ fontFamily: 'Inter, sans-serif', height: 44 }}
-                    />
-                  )}
-                </Field>
-                {err && <Notice tone="bad">{err}</Notice>}
-                <div className="pt-2">
-                  <Button
-                    variant="primary"
-                    type="submit"
-                    loading={busy}
-                    className="w-full expand-on-hover shadow-md shadow-indigo-loom/20 hover:shadow-lg transition-shadow"
-                    style={{ fontFamily: 'Inter, sans-serif', height: 46, fontSize: '15px' }}
-                  >
-                    Sign in
-                  </Button>
-                </div>
-              </form>
-
-              <hr className="divider-line" />
-
-              <div className="demo-box">
-                <p className="demo-label expand-on-hover">Quick demo accounts (PW: loomiq@2026)</p>
-                <div className="demo-grid">
-                  {DEMO.map(([name, role]) => (
-                    <button
-                      key={name}
-                      type="button"
-                      className="demo-btn"
-                      onClick={() => { setU(name); setP('loomiq@2026'); submit(name, 'loomiq@2026') }}
-                    >
-                      <span className="demo-btn-name">{name}</span>
-                      <span className="demo-btn-role">{ROLES[role]}</span>
-                    </button>
-                  ))}
-                </div>
+        {/* ── Demo Accounts Explorer (Persona Guide) ── */}
+        <div className="space-y-6">
+          <div className="rounded-2xl border border-line bg-white p-6 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-4 mb-5">
+              <div>
+                <h2 className="text-[18px] font-bold text-indigo-loom flex items-center gap-2">
+                  <UserCheck className="size-5 text-[#2BB3A3]" />
+                  <span>1-Click Role Exploration (Demo Accounts)</span>
+                </h2>
+                <p className="text-[13px] text-ink-3 mt-0.5">
+                  Click any card below to automatically sign in and see how the mill adapts to each specific role.
+                </p>
               </div>
+              <span className="rounded-full bg-sunk px-2.5 py-1 text-[11.5px] font-medium text-ink-2">
+                8 Pre-configured Roles
+              </span>
+            </div>
+
+            <div className="space-y-6">
+              {DEMO_PERSONAS.map((group) => (
+                <div key={group.category}>
+                  <h3 className="text-[12px] font-bold uppercase tracking-wider text-ink-3 mb-2.5">
+                    {group.category}
+                  </h3>
+                  <div className="grid gap-2.5 sm:grid-cols-2">
+                    {group.accounts.map((acc) => (
+                      <button
+                        key={acc.username}
+                        type="button"
+                        onClick={() => {
+                          setU(acc.username)
+                          setP('loomiq@2026')
+                          submit(acc.username, 'loomiq@2026')
+                        }}
+                        className="group flex flex-col justify-between text-left rounded-xl border border-line bg-page hover:bg-white hover:border-indigo-loom/40 hover:shadow-md transition-all p-3.5"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between gap-1 mb-1">
+                            <span className="font-semibold text-[14px] text-ink group-hover:text-indigo-loom">
+                              {acc.label}
+                            </span>
+                            <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-medium border ${ROLE_COLORS[acc.role]}`}>
+                              {acc.badge}
+                            </span>
+                          </div>
+                          <div className="text-[12px] font-medium text-indigo-loom mb-1">
+                            {acc.title} · <code className="text-[11.5px] text-ink-3 font-normal">{acc.username}</code>
+                          </div>
+                          <p className="text-[12px] text-ink-2 leading-relaxed">
+                            {acc.desc}
+                          </p>
+                        </div>
+
+                        <div className="mt-3 flex items-center justify-between pt-2 border-t border-line/60 text-[11.5px] text-indigo-thread font-medium">
+                          <span>Sign in as {acc.label.split(' ')[0]}</span>
+                          <ChevronRight className="size-3.5 transform group-hover:translate-x-0.5 transition-transform" />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
-      </div>
-    </>
+      </main>
+
+      {/* ── Footer ── */}
+      <footer className="border-t border-line bg-white py-4 px-6 text-center text-[12.5px] text-ink-3">
+        LoomIQ · Everest Textile Mills Operating System · Odoo NMIT Hackathon 2026
+      </footer>
+    </div>
   )
 }

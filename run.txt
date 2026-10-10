@@ -1,0 +1,1 @@
+cd D:\Loomiq\backend; $env:LOOMIQ_DATABASE_URL='sqlite:///D:/Loomiq/backend/loomiq.db'; python -m uvicorn app.main:app --host 127.0.0.1 --port 8000

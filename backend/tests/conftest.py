@@ -1,7 +1,7 @@
 import os
 from datetime import date, timedelta
 
-os.environ["LOOMIQ_DATABASE_URL"] = "sqlite:///./test_loomiq.db"
+os.environ.setdefault("LOOMIQ_DATABASE_URL", "postgresql+psycopg://loomiq:loomiq@localhost:5432/loomiq_test")
 os.environ.setdefault("LOOMIQ_STORAGE_DIR", "/tmp/loomiq-test-storage")
 
 import pytest  # noqa: E402
@@ -15,10 +15,6 @@ PW = seed.DEMO_PASSWORD
 
 @pytest.fixture(scope="module", autouse=True)
 def fresh_db():
-    import os
-    db_path = os.path.join(os.path.dirname(__file__), "..", "test_loomiq.db")
-    if os.path.exists(db_path):
-        os.remove(db_path)
     seed.reset()
     seed.seed()
     yield

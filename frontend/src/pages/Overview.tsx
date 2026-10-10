@@ -2,11 +2,13 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { AlertTriangle, ArrowUpRight, Info, OctagonAlert } from 'lucide-react'
+import { AlertTriangle, ArrowUpRight, Info, OctagonAlert, X, Layers } from 'lucide-react'
 import { api } from '../lib/api'
+import { useAuth } from '../lib/auth'
 import { Badge, Button, ErrorBox, Input, LoadingBlock, Panel, Select, StatusBadge } from '../components/ui'
 import { ProductionChart, QualityChart, UtilizationBars } from '../components/charts'
-import { addDays, ago, int, isoDay, metres, money, pct, STAGE_NAMES } from '../lib/format'
+import { addDays, ago, int, isoDay, metres, money, pct, ROLES, STAGE_NAMES } from '../lib/format'
+import { NAV, ROLE_MODULES } from '../components/Shell'
 import type { Risk } from '../lib/types'
 
 type Dash = {
@@ -26,6 +28,7 @@ const STAGE_ORDER = ['weaving', 'dyeing', 'inspection', 'finishing', 'packed']
 
 export default function Overview() {
   const nav = useNavigate()
+  const { user } = useAuth()
   const [days, setDays] = useState(14)
   const [shift, setShift] = useState('')
   const [q, setQ] = useState('')
@@ -42,6 +45,7 @@ export default function Overview() {
 
   return (
     <div className="space-y-4">
+      <RoleWelcome user={user} nav={nav} />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-[26px] leading-tight font-semibold">Manufacturing command centre</h1>
@@ -194,5 +198,54 @@ function StagePipe({ stages }: { stages: { stage: string; metres: number }[] }) 
         </li>
       ))}
     </ol>
+  )
+}
+
+/** Role-specific welcome banner — shows on first page load, dismissable. */
+type WelcomeProps = { user: { full_name: string; role: string } | null; nav: (to: string) => void }
+function RoleWelcome({ user, nav }: WelcomeProps) {
+  const key = `loomiq.welcome.${user?.role ?? ''}`
+  const [dismissed, setDismissed] = useState(() => {
+    try { return localStorage.getItem(key) === '1' } catch { return false }
+  })
+  if (!user || dismissed) return null
+
+  const dismiss = () => {
+    setDismissed(true)
+    try { localStorage.setItem(key, '1') } catch { /* ignore */ }
+  }
+
+  const firstName = user.full_name.split(' ')[0]
+  const roleName = ROLES[user.role] ?? user.role
+  const myModules = ROLE_MODULES[user.role] ?? []
+  const navMap = Object.fromEntries(NAV.map((n) => [n.label, n]))
+
+  return (
+    <div className="relative rounded-xl border border-indigo-loom/20 bg-gradient-to-r from-indigo-loom/5 to-transparent p-4">
+      <button onClick={dismiss} className="absolute top-3 right-3 rounded p-1 text-ink-3 hover:bg-sunk" aria-label="Dismiss">
+        <X className="size-4" />
+      </button>
+      <div className="flex items-center gap-2 mb-3">
+        <Layers className="size-5 text-indigo-loom shrink-0" />
+        <div>
+          <p className="text-[15px] font-semibold text-indigo-loom">Welcome back, {firstName}!</p>
+          <p className="text-[12.5px] text-ink-3">Signed in as <span className="font-medium text-ink">{roleName}</span> · Your modules are highlighted below</p>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {myModules.map((label) => {
+          const n = navMap[label]
+          if (!n) return null
+          const Icon = n.icon
+          return (
+            <button key={label} onClick={() => { nav(n.to); dismiss() }}
+              className="flex items-center gap-1.5 rounded-lg border border-indigo-loom/20 bg-white px-3 py-1.5 text-[13px] font-medium text-indigo-loom shadow-sm hover:bg-indigo-loom hover:text-white transition-colors">
+              <Icon className="size-3.5" />
+              {label}
+            </button>
+          )
+        })}
+      </div>
+    </div>
   )
 }
