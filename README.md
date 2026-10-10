@@ -1,123 +1,332 @@
-# LoomIQ
+# LoomIQ 🧵
 
-**Every roll traceable. Every order visible. Every decision informed.**
+### Every roll traceable. Every order visible. Every decision informed.
 
-LoomIQ is a textile manufacturing platform for Everest Textile Mills (Odoo NMIT Hackathon, Textile Manufacturing System challenge). It connects every stage on one shared database:
+LoomIQ is a textile manufacturing management system built for the **Odoo x NMIT Hackathon — Textile Manufacturing System Challenge**.
 
-yarn receipt → raw-material stock → order confirmation and reservation → weaving / dyeing / finishing jobs → fabric rolls with QR passports → image-assisted inspection → dispatch → order costing → management insights.
+It connects the complete textile manufacturing process in one platform, from yarn receipt to finished fabric dispatch.
 
-Each operational event updates every downstream record. For example, an inspector rejecting a roll immediately:
+Instead of managing stock in notebooks, checking machines manually, recording quality on paper and updating buyers through phone calls, LoomIQ brings everything together in one system.
 
-- blocks that roll from dispatch;
-- lowers the order's accepted quantity and raises its quality shortfall;
-- feeds the risk score, the cost-of-quality figures, and the buyer's released quantity.
+## 🚀 Features
 
-## Quick start
+- **Smart Inventory Management** – Track yarn stock, material lots, receipts, reservations and low-stock alerts.
+- **Order Management** – Manage buyer orders, deadlines, fabric requirements and material readiness.
+- **Production Monitoring** – Track spinning, weaving, dyeing and finishing jobs, machine status and production progress.
+- **Quality Inspection** – Inspect fabric rolls, record defects and classify rolls as pass, rework or reject.
+- **QR Roll Passport** – Trace every roll back to its order, machine, production job, yarn lots and inspection history.
+- **Dispatch Management** – Manage finished stock, partial shipments, packing lists and dispatch confirmation.
+- **Cost Intelligence** – Compare estimated and recorded production costs, including the impact of rejected fabric.
+- **Production Delay Radar** – Identify order risks using explainable, rule-based analysis.
+- **Quality Impact Chain** – Understand how a rejected roll affects accepted quantity, order shortfall, dispatch risk and cost.
+- **What-if Simulator** – Explore machine downtime and rejection scenarios without changing actual production records.
+- **Buyer Portal** – Allow buyers to track their own orders, released rolls and packing lists.
+- **Role-Based Access** – Separate access for administrators, production, stores, quality, dispatch, finance and buyers.
 
-Requirements: Python 3.11+, Node 20+, PostgreSQL 14+ (SQLite works as a documented local fallback).
+## 💡 What makes LoomIQ different?
+
+LoomIQ connects factory operations instead of treating every department separately.
+
+For example, when a quality inspector rejects a fabric roll:
+
+- The rejected roll becomes unavailable for dispatch.
+- The order's accepted quantity and quality shortfall are updated.
+- Replacement requirements and dispatch risks are recalculated.
+- Quality-related costs are reflected in the relevant insights.
+- Buyers see the updated released quantity for their order.
+
+Every operational event contributes to a connected view of the factory.
+
+## 🛠️ Tech Stack
+
+| Layer            | Technology                          |
+| ---------------- | ----------------------------------- |
+| Frontend         | React 19, TypeScript, Vite          |
+| UI               | Tailwind CSS 4, Lucide Icons        |
+| Data Fetching    | TanStack Query                      |
+| Charts           | Recharts                            |
+| Backend          | Python, FastAPI, Pydantic           |
+| Database         | PostgreSQL                          |
+| ORM & Migrations | SQLAlchemy 2, Alembic               |
+| Authentication   | JWT, bcrypt, role-based permissions |
+| Image Analysis   | OpenCV                              |
+| Testing          | Pytest, Vitest, Playwright          |
+
+SQLite is supported as a local-development fallback. The project uses PostgreSQL for its main database setup.
+
+**Note:** LoomIQ is an independent application, not an Odoo addon, because the hackathon allowed the use of other technology stacks.
+
+## ⚙️ Installation and Setup
+
+### Requirements
+
+Make sure the following are installed:
+
+- Python 3.11 or later
+- Node.js 20 or later
+- PostgreSQL 14 or later (or use the documented SQLite fallback)
+- Git
+
+### 1. Clone the repository
 
 ```bash
-scripts/setup.sh          # deps, database, migrations, demo data, frontend build
-scripts/run.sh            # http://localhost:8000  (API + UI on one port)
-scripts/run.sh dev        # API :8000 with reload, UI dev server on http://localhost:5173
+git clone <your-github-repository-url>
+cd loomiq
 ```
 
-Manual equivalent:
+Replace the URL with your actual GitHub repository URL.
+
+### 2. Set up the project
+
+```bash
+scripts/setup.sh
+```
+
+This script is intended to install dependencies, configure the database, run migrations, generate demo data and build the frontend.
+
+Follow any prompts or environment configuration instructions shown by the script.
+
+### 3. Start LoomIQ
+
+```bash
+scripts/run.sh
+```
+
+Open the application at:
+
+**http://localhost:8000**
+
+To run the backend and frontend in development mode:
+
+```bash
+scripts/run.sh dev
+```
+
+The API runs on port `8000`, and the frontend development server runs on port `5173`.
+
+### Manual Setup
+
+If you prefer to configure the application manually:
+
+**Backend**
 
 ```bash
 cd backend
 pip install -r requirements.txt
-export LOOMIQ_DATABASE_URL=postgresql+psycopg://loomiq:loomiq@localhost:5432/loomiq
-python -m app.seed --reset                 # runs Alembic migrations, then seeds demo data
-uvicorn app.main:app --port 8000
-cd ../frontend && npm install && npm run dev
 ```
 
-API documentation (OpenAPI) is served at `/docs`.
+Configure the database URL using your local environment or `.env` file:
 
-### Demo accounts (password `loomiq@2026`)
-
-| User | Role |
-|---|---|
-| admin | Administrator |
-| pm.ravi | Production manager |
-| store.meena | Storekeeper |
-| qc.anitha | Quality inspector |
-| dispatch.karthik | Dispatch operator |
-| finance.priya | Finance & management |
-| buyer.cae / buyer.nhl | Buyers (Coimbatore Apparel Exports / Nordic Home Linens) |
-
-The demo data is generated by `app/seed.py` running the real business services (reserve, weave, consume, inspect, review, dispatch) and is then back-dated across two weeks. It is labelled as demo data in the UI.
-
-## Five-minute demo script
-
-1. **Overview** (pm.ravi). SO-2026-0003 is at high risk. Open it to see the factors: yarn shortage caused by rejected fabric, no slack, rejected and held rolls, and loom downtime. Each factor shows its rule and points.
-2. **AI quality inspection** (qc.anitha). Inspect a roll and upload a fabric photo. The baseline draws the regions it measured, reports a heuristic anomaly score, and states that confidence is not available. Reject the roll. The decision panel then shows the replacement needed and the **Quality Impact Chain** (defect → roll → order → shortfall → replacement → dispatch risk → cost).
-3. **Roll traceability**. Open the rejected roll's passport: loom, weaving job, yarn lots, stage history, inspections, the QR label, and the reason it is blocked from dispatch. Open the QR link in a private window to see the public verification page, which shows no costs, suppliers or staff.
-4. **Dispatch** (dispatch.karthik). Confirm the planned dispatch for SO-2026-0004 with a vehicle number. Shipped quantity and dispatch status update, and the order completes only when the full quantity has shipped.
-5. **Cost intelligence** (finance.priya). Estimates and recorded actuals sit side by side. Cost sunk in rejected fabric is shown separately and is not added again.
-6. **Insights → What-if simulator**. Take a loom out for 3 shifts and raise the rejection rate to 20%. Compare finish dates and cost to complete. Live records are untouched.
-7. **Buyer portal** (buyer.cae). Only this buyer's orders are shown, with stage progress, released rolls and packing lists. No costs or internal notes appear.
-
-## Architecture
-
-| Layer | Choice |
-|---|---|
-| Frontend | React 19, TypeScript, Vite, Tailwind CSS 4, TanStack Query, Recharts, Lucide icons |
-| Backend | FastAPI, Pydantic, SQLAlchemy 2, Alembic |
-| Database | PostgreSQL (SQLite fallback for local development only) |
-| Inspection analysis | OpenCV classical-CV baseline (`app/services/cv_inspect.py`) |
-| Auth | JWT bearer tokens, bcrypt password hashes, server-side role permissions |
-
-Odoo was not mandated for this submission, so this is an independent application rather than an Odoo addon.
-
-```
-backend/app/
-  models.py            data model (orders, lots, reservations, jobs, rolls, inspections, dispatch, cost ledger)
-  security.py          auth + permission matrix (enforced on every route)
-  services/            business rules: inventory, orders, production, quality, dispatch,
-                       costing, risk, impact, simulator, dashboard, cv_inspect
-  routers/             HTTP layer
-  seed.py              demo data via the real services
-backend/migrations/    Alembic
-backend/tests/         pytest (PostgreSQL)
-frontend/src/          pages per module, shared UI kit, charts
-e2e/journeys.py        Playwright browser journeys
+```dotenv
+LOOMIQ_DATABASE_URL=postgresql+psycopg://loomiq:loomiq@localhost:5432/loomiq
 ```
 
-### Business rules worth knowing
+Make sure the PostgreSQL database and user exist before running the application.
 
-- **Quantities are derived, never duplicated.** An order's accepted, rejected, rework, held and dispatched metres are computed from its rolls, so one inspection decision updates every view.
-- **Stock is per lot**, with explicit available, reserved and consumed columns and a movement log. Confirming an order reserves stock first-in, first-out; a partial reservation reports the shortage. Yarn is consumed only when a weaving job is completed. If stock is short, the completion is rejected and nothing changes. Rows are locked (`SELECT … FOR UPDATE`) and quantities never go negative.
-- **Explicit transitions.** Orders move draft → confirmed → in production → completed, with hold, resume and cancel. "In production" and "completed" are reached only through business events: the first job starting, and the final dispatch being confirmed. Cancelling releases reservations.
-- **Capacity-aware planning.** A job is refused if it would exceed the machine's shift capacity, or if the machine is in maintenance or broken down.
-- **Dispatch** accepts only accepted, packed, not-yet-shipped rolls of the same order that are not already on another planned dispatch. Confirmation re-validates every roll inside one transaction. Partial shipments are supported.
-- **Cost ledger.** Each cost entry is unique per source event (job, rework), so re-processing cannot double-charge. Formulas are documented in `services/costing.py` and shown in the UI.
-
-## Honest limitations
-
-- **The inspection model is a baseline, not a validated defect detector.** No fabric-defect model or labelled dataset was available. The baseline flags statistical outliers in the fabric's own texture and colour (spots, colour deviation, weave irregularity). It reports a heuristic anomaly score, never a probability or confidence. Its boxes are the regions it actually measured. Every result needs an inspector's decision, and the machine suggestion and human decision are stored separately. It was checked on synthetic fabric images only; on real photos, expect false positives (lighting, folds) until it is tuned or replaced by a trained model. The Reports page tracks baseline-vs-inspector agreement, which is not an accuracy figure.
-- **Machine status is simulated.** It is derived from job records and manual state changes. There is no sensor or IoT integration.
-- **The risk engine is a deterministic rule-based score**, not a trained predictive model. It reports "unknown" when no loom capacity is available, and "low confidence" when no production is planned.
-- **The simulator** is a simplified shift-by-shift weaving model with the assumptions listed on screen. Its results are estimates.
-- **Costs** use standard costs and spec rates from the demo data. They are not real mill figures and make no claim about savings.
-- **Secrets.** `LOOMIQ_SECRET_KEY` must be changed for any shared deployment, and the demo passwords are public.
-- **Missing brief text.** The supplied brief was cut off in section 9 (Security). The remaining security, testing and deliverable items were completed with sensible defaults; see `docs/IMPLEMENTATION_STATUS.md`.
-
-## Tests
+Generate demo data and apply migrations:
 
 ```bash
-cd backend && pytest -q                    # 15 API/business-rule tests on PostgreSQL (database loomiq_test)
-cd frontend && npm test                    # unit tests (vitest)
-python -m app.seed --reset && python ../e2e/journeys.py   # 6 browser journeys (needs both servers running)
+python -m app.seed --reset
 ```
 
-## Configuration
+Start the backend:
 
-| Variable | Default |
-|---|---|
-| `LOOMIQ_DATABASE_URL` | `postgresql+psycopg://loomiq:loomiq@localhost:5432/loomiq` |
-| `LOOMIQ_SECRET_KEY` | dev-only value; **change it** |
-| `LOOMIQ_STORAGE_DIR` | `backend/storage` (inspection images are stored on disk, not in the database) |
-| `LOOMIQ_MAX_UPLOAD_MB` | `10` |
-| `LOOMIQ_FRONTEND_URL` | empty, so QR links use the host the request came from |
+```bash
+uvicorn app.main:app --port 8000
+```
+
+**Frontend**
+
+Open another terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+API documentation is available at:
+
+http://localhost:8000/docs
+
+## 🔐 Demo Login Credentials
+
+All demo accounts use the password:
+
+```text
+loomiq@2026
+```
+
+| Username           | Role                               |
+| ------------------ | ---------------------------------- |
+| `admin`            | Administrator                      |
+| `pm.ravi`          | Production Manager                 |
+| `store.meena`      | Storekeeper                        |
+| `qc.anitha`        | Quality Inspector                  |
+| `dispatch.karthik` | Dispatch Operator                  |
+| `finance.priya`    | Finance & Management               |
+| `buyer.cae`        | Buyer — Coimbatore Apparel Exports |
+| `buyer.nhl`        | Buyer — Nordic Home Linens         |
+
+These credentials are for demonstration only. Change default passwords and the secret key before any shared or production deployment.
+
+## 🎬 Five-Minute Demo
+
+### 1. Production Overview
+
+Login as `pm.ravi` and open order `SO-2026-0003`.
+
+Show the high-risk status and its contributing factors, including yarn shortage, rejected or held rolls, loom downtime and limited deadline slack.
+
+### 2. AI-Assisted Quality Inspection
+
+Login as `qc.anitha` and upload a fabric image.
+
+Show the measured image regions, heuristic anomaly score and inspector decision. Reject a roll and demonstrate how the Quality Impact Chain connects the defect to order shortfall, replacement requirements, dispatch risk and cost.
+
+### 3. Roll Traceability
+
+Open the rejected roll's QR passport.
+
+Show its machine, production job, yarn lots, stage history, inspection records and dispatch restriction.
+
+Open the public QR verification page to demonstrate that internal costs, supplier information and staff details are not exposed.
+
+### 4. Dispatch Management
+
+Login as `dispatch.karthik` and confirm the planned dispatch for `SO-2026-0004`.
+
+Show the vehicle details, shipment quantity and updated dispatch status. Explain how partial shipments are supported.
+
+### 5. Cost Intelligence
+
+Login as `finance.priya`.
+
+Compare estimated costs with recorded actuals. Show the cost impact of rejected fabric and explain how the ledger prevents the same source event from being charged twice.
+
+### 6. What-if Simulation
+
+Open **Insights → What-if Simulator**.
+
+Simulate three shifts of loom downtime and increase the rejection rate to 20%. Compare projected completion dates and cost to complete.
+
+The simulation is an estimate and does not modify live production records.
+
+### 7. Buyer Portal
+
+Login as `buyer.cae`.
+
+Show the buyer's order progress, production stages, released rolls and packing lists. Demonstrate that the buyer cannot access other customers' orders or internal cost information.
+
+## 🏗️ Project Structure
+
+```text
+loomiq/
+├── backend/
+│   ├── app/
+│   │   ├── models.py
+│   │   ├── security.py
+│   │   ├── seed.py
+│   │   ├── routers/
+│   │   └── services/
+│   ├── migrations/
+│   ├── tests/
+│   └── requirements.txt
+├── frontend/
+│   └── src/
+│       ├── pages/
+│       ├── components/
+│       ├── lib/
+│       └── __tests__/
+├── e2e/
+│   └── journeys.py
+├── docs/
+│   └── IMPLEMENTATION_STATUS.md
+├── scripts/
+│   ├── setup.sh
+│   └── run.sh
+└── README.md
+```
+
+### Main Backend Services
+
+- `inventory.py` – Stock, receipts, reservations and material consumption.
+- `orders.py` – Order lifecycle and material readiness.
+- `production.py` – Production jobs, machine capacity and job transitions.
+- `quality.py` – Roll inspection, rework and quality decisions.
+- `dispatch.py` – Shipment eligibility and dispatch confirmation.
+- `costing.py` – Estimated and recorded production costs.
+- `risk.py` – Rule-based production delay assessment.
+- `impact.py` – Quality impact analysis.
+- `simulator.py` – What-if production scenarios.
+- `dashboard.py` – Operational insights and reporting.
+- `cv_inspect.py` – Classical computer-vision image analysis.
+
+## 📏 Important Business Rules
+
+- **Stock is tracked by material lot.** Receipts, reservations, consumption and stock movements maintain inventory history.
+- **Material is consumed through production events.** Insufficient stock must prevent an invalid completion.
+- **Production follows explicit state transitions.** Orders progress through business events rather than arbitrary status changes.
+- **Machine capacity is enforced.** Jobs must respect machine availability, shift capacity and breakdown or maintenance states.
+- **Quality decisions control dispatch.** Rejected rolls cannot be shipped, and rework requires the appropriate subsequent inspection.
+- **Partial dispatch is supported.** Only eligible rolls belonging to the correct order may be shipped.
+- **Costs are linked to source events.** Reprocessing an existing event should not duplicate its cost.
+- **Access is role-based.** Buyers are restricted to their own permitted information, and public QR verification does not expose internal factory records.
+
+## 🧪 Testing
+
+### Backend Tests
+
+```bash
+cd backend
+pytest -q
+```
+
+The test suite is intended to cover API behaviour, authentication and core business rules using PostgreSQL and the configured test database.
+
+### Frontend Tests
+
+```bash
+cd frontend
+npm test
+```
+
+### End-to-End Tests
+
+Start the backend and frontend, then run the browser journeys using the repository's documented environment and seed instructions:
+
+```bash
+python -m app.seed --reset
+python ../e2e/journeys.py
+```
+
+Run the end-to-end command from the directory expected by the repository configuration. These journeys require the application servers and browser dependencies to be available.
+
+## ⚠️ Limitations
+
+- **Quality inspection:** The current OpenCV implementation is an experimental anomaly-detection baseline, not a trained or validated fabric-defect model. It reports heuristic scores rather than probabilities and requires a human inspector's decision.
+- **Machine monitoring:** Machine status is derived from job records and manual state changes. Live IoT sensor integration is not available.
+- **Production risk:** The delay-risk engine uses deterministic rules, not a trained predictive model.
+- **What-if simulation:** The simulator uses simplified shift-based assumptions. Its results are estimates, not guaranteed production outcomes.
+- **Cost calculations:** Demo costs use configured standard rates and synthetic demo data; they are not actual mill financial figures.
+- **Security:** The development secret key and demo credentials must be replaced before shared deployment.
+
+## 🔧 Environment Variables
+
+| Variable               | Purpose                                                       |
+| ---------------------- | ------------------------------------------------------------- |
+| `LOOMIQ_DATABASE_URL`  | Database connection URL                                       |
+| `LOOMIQ_SECRET_KEY`    | Secret used for authentication; replace the development value |
+| `LOOMIQ_STORAGE_DIR`   | Storage directory for inspection images                       |
+| `LOOMIQ_MAX_UPLOAD_MB` | Maximum image upload size                                     |
+| `LOOMIQ_FRONTEND_URL`  | Optional frontend URL for generated QR links                  |
+
+Do not commit `.env` files, passwords, database credentials or production secrets to GitHub.
+
+## 🎯 Project Goal
+
+LoomIQ aims to make textile manufacturing more connected, transparent and easier to manage.
+
+By linking inventory, production, quality, dispatch and cost intelligence, the platform helps factory teams identify problems earlier, trace defects, track buyer orders and make better operational decisions.
+
+**LoomIQ — Every roll traceable. Every order visible. Every decision informed.** 🧵
