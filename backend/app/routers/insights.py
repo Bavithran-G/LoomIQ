@@ -39,7 +39,7 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
 
 @router.post("/auth/register", status_code=201)
 def register(body: RegisterIn, db: Session = Depends(get_db)):
-    """Self-registration — account is created as inactive (pending admin activation)."""
+    """Self-registration — account is created and activated immediately."""
     if db.scalar(select(User.id).where(User.username == body.username)):
         raise BusinessError("Username already taken. Please choose a different one.", 409, "username_taken")
     role_map = {r.value: r for r in Role}
@@ -51,11 +51,19 @@ def register(body: RegisterIn, db: Session = Depends(get_db)):
         full_name=body.full_name,
         password_hash=hash_password(body.password),
         role=role_enum,
-        is_active=False,   # admin must activate via Admin panel
+        is_active=True,   # active so user can log in immediately
     )
     db.add(new_user)
     db.commit()
-    return {"message": "Account created. An administrator will activate your account.", "username": body.username}
+    db.refresh(new_user)
+    return {
+        "message": "Account created successfully.",
+        "username": body.username,
+        "access_token": create_token(new_user),
+        "token_type": "bearer",
+        "user": user_out(new_user),
+        "permissions": permissions_for(new_user.role)
+    }
 
 
 @router.get("/auth/me")

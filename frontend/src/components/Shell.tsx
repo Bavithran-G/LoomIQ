@@ -3,7 +3,7 @@ import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import clsx from 'clsx'
 import {
-  Bell, Boxes, ChevronsLeft, ChevronsRight, ClipboardList, Cog, Factory, Gauge, IndianRupee, LineChart, LogOut, Menu,
+  ArrowLeft, Bell, Boxes, ChevronsLeft, ChevronsRight, ClipboardList, Cog, Factory, Gauge, IndianRupee, LineChart, LogOut, Menu,
   QrCode, ScanSearch, Search, ShieldCheck, Truck, Users, X,
 } from 'lucide-react'
 import { useAuth } from '../lib/auth'
@@ -28,12 +28,12 @@ export const NAV = [
 
 /** Modules each role primarily uses — shown as role-specific welcome tiles. */
 export const ROLE_MODULES: Record<string, string[]> = {
-  admin: ['Command Centre', 'Sales Orders', 'Inventory', 'Production Planning', 'Quality Inspection', 'Dispatch', 'Cost Intelligence', 'Administration'],
+  admin: ['Command Centre', 'Sales Orders', 'Inventory', 'Production Planning', 'Machine Monitoring', 'Quality Inspection', 'Roll Traceability', 'Dispatch', 'Cost Intelligence', 'Insights & Reports', 'Administration'],
   production_manager: ['Command Centre', 'Sales Orders', 'Production Planning', 'Machine Monitoring', 'Quality Inspection', 'Roll Traceability', 'Insights & Reports'],
-  storekeeper: ['Inventory', 'Sales Orders', 'Roll Traceability', 'Production Planning'],
-  quality_inspector: ['Quality Inspection', 'Roll Traceability', 'Sales Orders'],
+  storekeeper: ['Inventory', 'Roll Traceability'],
+  quality_inspector: ['Quality Inspection', 'Roll Traceability'],
   dispatch_operator: ['Dispatch', 'Roll Traceability', 'Sales Orders'],
-  finance: ['Cost Intelligence', 'Insights & Reports', 'Sales Orders', 'Command Centre'],
+  finance: ['Cost Intelligence', 'Insights & Reports'],
   buyer: ['Buyer Portal'],
 }
 
@@ -49,13 +49,17 @@ function useClickAway(ref: React.RefObject<HTMLElement | null>, fn: () => void) 
 
 export function Shell({ children }: { children: ReactNode }) {
   const { user, can, logout } = useAuth()
+  const navTo = useNavigate()
   const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem('loomiq.nav') === '1' } catch { return false } })
   const [mobile, setMobile] = useState(false)
   const loc = useLocation()
   useEffect(() => setMobile(false), [loc.pathname])
   useEffect(() => { try { localStorage.setItem('loomiq.nav', collapsed ? '1' : '0') } catch { /* ignore */ } }, [collapsed])
-  const items = NAV.filter((n) => can(n.perm))
-  const current = NAV.find((n) => (n.to === '/' ? loc.pathname === '/' : loc.pathname.startsWith(n.to)))
+
+  // Strictly filter items to only what the user's role is designated to see
+  const allowedLabels = user ? (ROLE_MODULES[user.role] ?? []) : []
+  const items = NAV.filter((n) => can(n.perm) && allowedLabels.includes(n.label))
+  const current = NAV.find((n) => (n.to === '/app' ? loc.pathname === '/app' : loc.pathname.startsWith(n.to)))
 
   const nav = (isMobile: boolean) => (
     <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2 py-3" aria-label="Main">
@@ -100,13 +104,33 @@ export function Shell({ children }: { children: ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="no-print sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-line bg-surface/95 px-3 backdrop-blur sm:px-5">
           <button className="rounded p-1.5 text-ink-2 hover:bg-sunk lg:hidden" onClick={() => setMobile(true)} aria-label="Open navigation"><Menu className="size-5" /></button>
+          
+          {/* Back button if on any page other than the user's primary landing (/app or /portal) */}
+          {loc.pathname !== '/app' && loc.pathname !== '/portal' && (
+            <button
+              onClick={() => navTo(-1)}
+              className="flex items-center gap-1 rounded-md px-2 py-1 text-[13px] font-medium text-ink-2 hover:bg-sunk hover:text-indigo-loom transition-colors"
+              title="Go back"
+            >
+              <ArrowLeft className="size-4" />
+              <span className="hidden sm:inline">Back</span>
+            </button>
+          )}
+
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[12.5px] text-ink-3">Everest Textile Mills{current && current.to !== '/' ? ` / ${current.label}` : ''}</div>
+            <div className="truncate text-[12.5px] text-ink-3">Everest Textile Mills{current && current.to !== '/app' ? ` / ${current.label}` : ''}</div>
             <div className="truncate font-display text-[17px] leading-tight font-semibold text-indigo-loom">{current?.label ?? 'LoomIQ'}</div>
           </div>
           {user?.role !== 'buyer' && <GlobalSearch />}
           {can('dashboard.view') && <Notifications />}
-          <UserMenu name={user?.full_name ?? ''} role={ROLES[user?.role ?? ''] ?? ''} onLogout={logout} />
+          <UserMenu
+            name={user?.full_name ?? ''}
+            role={ROLES[user?.role ?? ''] ?? ''}
+            onLogout={() => {
+              logout()
+              navTo('/login', { replace: true })
+            }}
+          />
         </header>
         <main className="mx-auto w-full max-w-[1480px] flex-1 px-3 py-5 sm:px-5 lg:px-6">{children}</main>
       </div>

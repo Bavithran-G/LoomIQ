@@ -132,13 +132,23 @@ export default function Login() {
   const [rOk, setROk] = useState(false)
   const [rBusy, setRBusy] = useState(false)
 
+  const roleHome: Record<string, string> = {
+    buyer: '/portal',
+    finance: '/cost',
+    storekeeper: '/inventory',
+    quality_inspector: '/quality',
+    dispatch_operator: '/dispatch',
+    production_manager: '/app',
+    admin: '/app',
+  }
+
   const submit = async (username = u, password = p) => {
     setErr(null)
     if (!username || !password) { setErr('Please enter your username and password.'); return }
     setBusy(true)
     try {
       const user = await login(username.trim().toLowerCase(), password)
-      nav(user.role === 'buyer' ? '/portal' : '/app', { replace: true })
+      nav(roleHome[user.role] ?? '/app', { replace: true })
     } catch (e) { setErr((e as Error).message) } finally { setBusy(false) }
   }
 
@@ -163,7 +173,7 @@ export default function Login() {
       })
       // Immediately log the user in with their new credentials
       const user = await login(rUser.trim().toLowerCase(), rPass)
-      nav(user.role === 'buyer' ? '/portal' : '/app', { replace: true })
+      nav(roleHome[user.role] ?? '/app', { replace: true })
     } catch (e) {
       setRErr((e as Error).message)
     } finally {
