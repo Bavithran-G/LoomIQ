@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+backend/storage/
+node_modules/
+frontend/dist/
+.env
+*.db
+.agents/
+.gemini/
+*.log
+backend/check_db.py
