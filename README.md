@@ -170,54 +170,6 @@ loomiq@2026
 
 These credentials are for demonstration only. Change default passwords and the secret key before any shared or production deployment.
 
-## 🎬 Five-Minute Demo
-
-### 1. Production Overview
-
-Login as `pm.ravi` and open order `SO-2026-0003`.
-
-Show the high-risk status and its contributing factors, including yarn shortage, rejected or held rolls, loom downtime and limited deadline slack.
-
-### 2. AI-Assisted Quality Inspection
-
-Login as `qc.anitha` and upload a fabric image.
-
-Show the measured image regions, heuristic anomaly score and inspector decision. Reject a roll and demonstrate how the Quality Impact Chain connects the defect to order shortfall, replacement requirements, dispatch risk and cost.
-
-### 3. Roll Traceability
-
-Open the rejected roll's QR passport.
-
-Show its machine, production job, yarn lots, stage history, inspection records and dispatch restriction.
-
-Open the public QR verification page to demonstrate that internal costs, supplier information and staff details are not exposed.
-
-### 4. Dispatch Management
-
-Login as `dispatch.karthik` and confirm the planned dispatch for `SO-2026-0004`.
-
-Show the vehicle details, shipment quantity and updated dispatch status. Explain how partial shipments are supported.
-
-### 5. Cost Intelligence
-
-Login as `finance.priya`.
-
-Compare estimated costs with recorded actuals. Show the cost impact of rejected fabric and explain how the ledger prevents the same source event from being charged twice.
-
-### 6. What-if Simulation
-
-Open **Insights → What-if Simulator**.
-
-Simulate three shifts of loom downtime and increase the rejection rate to 20%. Compare projected completion dates and cost to complete.
-
-The simulation is an estimate and does not modify live production records.
-
-### 7. Buyer Portal
-
-Login as `buyer.cae`.
-
-Show the buyer's order progress, production stages, released rolls and packing lists. Demonstrate that the buyer cannot access other customers' orders or internal cost information.
-
 ## 🏗️ Project Structure
 
 ```text
