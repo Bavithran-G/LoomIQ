@@ -34,34 +34,153 @@ export default function Inventory() {
         <Notice tone="warn" className="mb-3">Below reorder level: {mats.data.filter((m) => m.low_stock).map((m) => `${m.sku} (${num(m.available)} ${m.uom} free, ${num(m.on_order)} on order)`).join('; ')}</Notice>
       )}
       <Panel bodyClass="p-0">
-        <div className="px-3 pt-1"><Tabs value={tab} onChange={setTab} items={[{ value: 'stock', label: 'Stock by material' }, { value: 'lots', label: 'Lots' }, { value: 'po', label: 'Incoming purchase orders' }, { value: 'moves', label: 'Movement history' }]} /></div>
+        <div className="px-3 pt-2 bg-[#FAFBFD]/60 border-b border-line">
+          <Tabs value={tab} onChange={setTab} items={[
+            { value: 'stock', label: 'Stock by material' },
+            { value: 'lots', label: 'Lots' },
+            { value: 'po', label: 'Incoming purchase orders' },
+            { value: 'moves', label: 'Movement history' }
+          ]} />
+        </div>
         {tab === 'stock' && (mats.isLoading ? <LoadingBlock /> : mats.error ? <ErrorBox error={mats.error} /> : (
-          <TableWrap><table className="data-table min-w-[900px]">
-            <thead><tr><th>Material</th><th>Type</th><th className="num">Free</th><th className="num">Reserved</th><th className="num">Consumed</th><th className="num">On order</th><th className="w-44">Free vs reorder level</th><th>Supplier</th></tr></thead>
-            <tbody>{mats.data!.map((m) => (
-              <tr key={m.id} className="cursor-pointer" onClick={() => setSel(m)}>
-                <td><span className="font-medium text-indigo-thread">{m.sku}</span><div className="text-[12px] text-ink-3">{m.name}</div></td>
-                <td>{human(m.material_type)}</td>
-                <td className={clsx('num font-medium', m.low_stock && 'text-warn')}>{num(m.available)} {m.uom}</td>
-                <td className="num">{num(m.reserved)}</td><td className="num">{num(m.consumed)}</td><td className="num">{num(m.on_order)}</td>
-                <td><StockGauge m={m} /></td>
-                <td className="text-[13px]">{m.supplier ?? '–'}</td>
-              </tr>))}</tbody></table></TableWrap>))}
+          <TableWrap>
+            <table className="data-table min-w-[960px]">
+              <thead>
+                <tr>
+                  <th>Material SKU</th>
+                  <th>Classification</th>
+                  <th className="num">Free Stock</th>
+                  <th className="num">Reserved</th>
+                  <th className="num">Consumed</th>
+                  <th className="num">On Order</th>
+                  <th className="w-48">Free vs Reorder Level</th>
+                  <th>Primary Supplier</th>
+                </tr>
+              </thead>
+              <tbody>
+                {mats.data!.map((m) => (
+                  <tr key={m.id} className="cursor-pointer hover:bg-[#F8FAFB]" onClick={() => setSel(m)}>
+                    <td>
+                      <span className="font-semibold text-brand-teal hover:underline">{m.sku}</span>
+                      <div className="text-[12px] text-ink-3">{m.name}</div>
+                    </td>
+                    <td><Badge tone="neutral">{human(m.material_type)}</Badge></td>
+                    <td className={clsx('num font-bold tabular-nums', m.low_stock ? 'text-warn' : 'text-primary-navy')}>
+                      {num(m.available)} <span className="text-[11.5px] font-normal text-ink-3">{m.uom}</span>
+                    </td>
+                    <td className="num tabular-nums text-[#3568B0] font-medium">{num(m.reserved)}</td>
+                    <td className="num tabular-nums text-ink-3">{num(m.consumed)}</td>
+                    <td className="num tabular-nums text-ok font-medium">+{num(m.on_order)}</td>
+                    <td><StockGauge m={m} /></td>
+                    <td className="text-[12.5px] text-ink-2">{m.supplier ?? '–'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableWrap>
+        ))}
         {tab === 'lots' && (lots.isLoading ? <LoadingBlock /> : (
-          <TableWrap><table className="data-table min-w-[900px]"><thead><tr><th>Lot</th><th>Material</th><th>Supplier</th><th>Received</th><th className="num">Unit cost</th><th className="num">Received</th><th className="num">Free</th><th className="num">Reserved</th><th className="num">Consumed</th></tr></thead>
-            <tbody>{lots.data?.map((l) => <tr key={l.id}><td className="font-medium">{l.lot_number}</td><td>{l.sku}</td><td>{l.supplier ?? '–'}</td><td>{date(l.receipt_date)}</td><td className="num">{money2(l.unit_cost)}</td>
-              <td className="num">{num(l.qty_received)}</td><td className="num">{num(l.qty_available)}</td><td className="num">{num(l.qty_reserved)}</td><td className="num">{num(l.qty_consumed)}</td></tr>)}</tbody></table></TableWrap>))}
+          <TableWrap>
+            <table className="data-table min-w-[960px]">
+              <thead>
+                <tr>
+                  <th>Lot / Batch No</th>
+                  <th>Material</th>
+                  <th>Supplier</th>
+                  <th>Received Date</th>
+                  <th className="num">Unit Cost</th>
+                  <th className="num">Received Qty</th>
+                  <th className="num">Free</th>
+                  <th className="num">Reserved</th>
+                  <th className="num">Consumed</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lots.data?.map((l) => (
+                  <tr key={l.id} className="hover:bg-[#F8FAFB]">
+                    <td className="font-mono font-semibold text-primary-navy">{l.lot_number}</td>
+                    <td className="font-medium text-brand-teal">{l.sku}</td>
+                    <td className="text-ink-2 text-[12.5px]">{l.supplier ?? '–'}</td>
+                    <td className="text-ink-3 text-[12px]">{date(l.receipt_date)}</td>
+                    <td className="num font-semibold text-primary-navy tabular-nums">{money2(l.unit_cost)}</td>
+                    <td className="num tabular-nums">{num(l.qty_received)}</td>
+                    <td className="num font-bold text-primary-navy tabular-nums">{num(l.qty_available)}</td>
+                    <td className="num tabular-nums text-[#3568B0]">{num(l.qty_reserved)}</td>
+                    <td className="num tabular-nums text-ink-3">{num(l.qty_consumed)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableWrap>
+        ))}
         {tab === 'po' && (
           pls.data?.length === 0 ? <Empty title="No purchase orders" /> :
-          <TableWrap><table className="data-table min-w-[760px]"><thead><tr><th>PO</th><th>Material</th><th>Supplier</th><th className="num">Qty</th><th className="num">Unit cost</th><th>Expected</th><th>Status</th><th /></tr></thead>
-            <tbody>{pls.data?.map((p) => <tr key={p.id}><td className="font-medium">{p.po_number}</td><td>{p.sku}</td><td>{p.supplier}</td><td className="num">{num(p.qty)}</td><td className="num">{money2(p.unit_cost)}</td>
-              <td>{date(p.expected_date)}</td><td><Badge tone={p.status === 'open' ? 'info' : 'neutral'}>{human(p.status)}</Badge></td>
-              <td>{manage && p.status === 'open' && <Button size="sm" onClick={() => setReceive({ pl: p })}>Receive</Button>}</td></tr>)}</tbody></table></TableWrap>)}
+          <TableWrap>
+            <table className="data-table min-w-[800px]">
+              <thead>
+                <tr>
+                  <th>PO Number</th>
+                  <th>Material</th>
+                  <th>Supplier</th>
+                  <th className="num">Quantity</th>
+                  <th className="num">Unit Cost</th>
+                  <th>Expected Delivery</th>
+                  <th>Status</th>
+                  <th className="w-24 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pls.data?.map((p) => (
+                  <tr key={p.id} className="hover:bg-[#F8FAFB]">
+                    <td className="font-mono font-semibold text-primary-navy">{p.po_number}</td>
+                    <td className="font-medium text-brand-teal">{p.sku}</td>
+                    <td className="text-ink-2 text-[12.5px]">{p.supplier}</td>
+                    <td className="num font-semibold text-primary-navy tabular-nums">{num(p.qty)}</td>
+                    <td className="num tabular-nums text-ink-3">{money2(p.unit_cost)}</td>
+                    <td className="text-[12.5px] text-ink-2">{date(p.expected_date)}</td>
+                    <td><Badge tone={p.status === 'open' ? 'info' : 'neutral'}>{human(p.status)}</Badge></td>
+                    <td className="text-right">{manage && p.status === 'open' && <Button size="sm" variant="teal" onClick={() => setReceive({ pl: p })}>Receive</Button>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableWrap>
+        )}
         {tab === 'moves' && (moves.isLoading ? <LoadingBlock /> : (
-          <TableWrap><table className="data-table min-w-[900px]"><thead><tr><th>When</th><th>Type</th><th>Material</th><th>Lot</th><th className="num">Qty</th><th>Reason</th><th>By</th></tr></thead>
-            <tbody>{moves.data?.map((mv) => <tr key={mv.id}><td>{dateTime(mv.at)}</td><td><MoveBadge t={mv.type} /></td><td>{mv.sku}</td><td>{mv.lot}</td>
-              <td className={clsx('num', mv.qty < 0 ? 'text-ink-2' : 'text-ok')}>{mv.qty > 0 ? '+' : ''}{num(mv.qty)}</td><td className="text-[13px]">{mv.reason}</td><td>{mv.user ?? 'System'}</td></tr>)}</tbody></table>
-            <p className="px-4 py-2 text-[12.5px] text-ink-3">Reserve and consume movements are shown from the free-stock point of view: a reservation moves stock out of free into reserved.</p></TableWrap>))}
+          <TableWrap>
+            <table className="data-table min-w-[960px]">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Movement Type</th>
+                  <th>Material</th>
+                  <th>Lot / Batch</th>
+                  <th className="num">Quantity Delta</th>
+                  <th>Reason / Context</th>
+                  <th>Initiated By</th>
+                </tr>
+              </thead>
+              <tbody>
+                {moves.data?.map((mv) => (
+                  <tr key={mv.id} className="hover:bg-[#F8FAFB]">
+                    <td className="text-ink-3 text-[12px]">{dateTime(mv.at)}</td>
+                    <td><MoveBadge t={mv.type} /></td>
+                    <td className="font-medium text-brand-teal">{mv.sku}</td>
+                    <td className="font-mono text-[12px] text-ink-2">{mv.lot ?? '–'}</td>
+                    <td className={clsx('num font-semibold tabular-nums', mv.qty < 0 ? 'text-ink-2' : 'text-ok')}>
+                      {mv.qty > 0 ? '+' : ''}{num(mv.qty)}
+                    </td>
+                    <td className="text-[12.5px] text-ink-2">{mv.reason}</td>
+                    <td className="text-[12px] text-ink-3">{mv.user ?? 'System'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="border-t border-line px-4 py-2.5 text-[12px] text-ink-3 bg-[#FAFBFD]">
+              Reserve and consume movements are tracked against free stock: reservations shift quantities from free to reserved pool.
+            </div>
+          </TableWrap>
+        ))}
       </Panel>
       {sel && <MaterialModal m={sel} onClose={() => setSel(null)} onReceive={() => { setReceive({ material: sel }); setSel(null) }} canManage={manage} />}
       {receive && <ReceiveModal materials={mats.data ?? []} preset={receive} onClose={() => setReceive(null)} />}
@@ -71,11 +190,26 @@ export default function Inventory() {
 }
 
 function StockGauge({ m }: { m: Material }) {
-  const max = Math.max(m.available, m.reorder_threshold * 2, 1)
+  const max = Math.max(m.available, m.reorder_threshold * 1.8, 1)
+  const pct = Math.min(100, Math.max(0, (m.available / max) * 100))
+  const reorderPct = Math.min(100, Math.max(0, (m.reorder_threshold / max) * 100))
   return (
-    <div className="relative h-2.5 rounded-sm bg-sunk" title={`${num(m.available)} free / reorder at ${num(m.reorder_threshold)}`}>
-      <div className={clsx('h-full rounded-sm', m.low_stock ? 'bg-warn' : 'bg-ok')} style={{ width: `${(m.available / max) * 100}%` }} />
-      <div className="absolute -top-0.5 h-3.5 w-0.5 bg-ink" style={{ left: `${(m.reorder_threshold / max) * 100}%` }} aria-hidden />
+    <div className="flex flex-col gap-1 w-full max-w-[180px]">
+      <div className="relative h-2 w-full rounded-xs bg-sunk overflow-hidden" title={`${num(m.available)} free / reorder threshold at ${num(m.reorder_threshold)}`}>
+        <div
+          className={clsx('h-full transition-all rounded-xs', m.low_stock ? 'bg-warn' : 'bg-ok')}
+          style={{ width: `${pct}%` }}
+        />
+        <div
+          className="absolute -top-0.5 bottom-0 w-0.5 bg-primary-navy"
+          style={{ left: `${reorderPct}%` }}
+          aria-hidden
+        />
+      </div>
+      <div className="flex justify-between text-[10.5px] text-ink-3 tabular-nums">
+        <span>Min: {num(m.reorder_threshold)}</span>
+        <span className={m.low_stock ? 'font-semibold text-warn' : ''}>{num(m.available)} {m.uom}</span>
+      </div>
     </div>
   )
 }
