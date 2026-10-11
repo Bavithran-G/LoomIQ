@@ -2,290 +2,176 @@
 
 ### Every roll traceable. Every order visible. Every decision informed.
 
-LoomIQ is a textile manufacturing management system built for the **Odoo x NMIT Hackathon — Textile Manufacturing System Challenge**.
+LoomIQ is a textile manufacturing operations and intelligence platform built for the **Odoo x NMIT Hackathon — Textile Manufacturing System Challenge**. It connects inventory, orders, production, quality, dispatch and cost insights in one application, from yarn receipt to finished-fabric shipment.
 
-It connects the complete textile manufacturing process in one platform, from yarn receipt to finished fabric dispatch.
+## ✨ What LoomIQ does
 
-Instead of managing stock in notebooks, checking machines manually, recording quality on paper and updating buyers through phone calls, LoomIQ brings everything together in one system.
+- **Inventory & materials** — Track material lots, receipts, reservations, consumption and low-stock alerts.
+- **Orders & buyers** — Manage buyer orders, requirements, deadlines and material readiness, with a buyer portal scoped to each account.
+- **Production** — Plan and track manufacturing jobs, machine capacity, availability and downtime.
+- **Quality & traceability** — Inspect rolls, record quality decisions and follow each roll through its production and inspection history with a QR-enabled passport.
+- **Dispatch** — Ship eligible rolls, including partial orders, with packing lists and dispatch records.
+- **Cost intelligence** — Compare estimated and recorded costs and explore quality-related impacts.
+- **Operational insights** — Review production risks, quality impacts and read-only what-if scenarios.
+- **Role-based access** — Provide workflows for administration, production, stores, quality, dispatch, finance and buyers.
 
-## 🚀 Features
+LoomIQ links these workflows together. For example, a rejected roll is excluded from dispatch, affects accepted order quantity and related risk insights, and updates the released quantity visible to the buyer.
 
-- **Smart Inventory Management** – Track yarn stock, material lots, receipts, reservations and low-stock alerts.
-- **Order Management** – Manage buyer orders, deadlines, fabric requirements and material readiness.
-- **Production Monitoring** – Track spinning, weaving, dyeing and finishing jobs, machine status and production progress.
-- **Quality Inspection** – Inspect fabric rolls, record defects and classify rolls as pass, rework or reject.
-- **QR Roll Passport** – Trace every roll back to its order, machine, production job, yarn lots and inspection history.
-- **Dispatch Management** – Manage finished stock, partial shipments, packing lists and dispatch confirmation.
-- **Cost Intelligence** – Compare estimated and recorded production costs, including the impact of rejected fabric.
-- **Production Delay Radar** – Identify order risks using explainable, rule-based analysis.
-- **Quality Impact Chain** – Understand how a rejected roll affects accepted quantity, order shortfall, dispatch risk and cost.
-- **What-if Simulator** – Explore machine downtime and rejection scenarios without changing actual production records.
-- **Buyer Portal** – Allow buyers to track their own orders, released rolls and packing lists.
-- **Role-Based Access** – Separate access for administrators, production, stores, quality, dispatch, finance and buyers.
+## 🧰 Technology
 
-## 💡 What makes LoomIQ different?
+| Area | Technologies |
+| --- | --- |
+| Frontend | React 19, TypeScript, Vite |
+| UI & data | Tailwind CSS 4, TanStack Query, Lucide |
+| Visualizations | Recharts |
+| Backend | Python, FastAPI, Pydantic |
+| Database | PostgreSQL; SQLite for local development |
+| ORM & migrations | SQLAlchemy 2, Alembic |
+| Authentication | JWT, bcrypt, role-based permissions |
+| Image analysis | OpenCV |
+| Tests | Vitest, Playwright browser journeys |
 
-LoomIQ connects factory operations instead of treating every department separately.
+LoomIQ is a standalone application, not an Odoo addon.
 
-For example, when a quality inspector rejects a fabric roll:
+## 🚀 Get started
 
-- The rejected roll becomes unavailable for dispatch.
-- The order's accepted quantity and quality shortfall are updated.
-- Replacement requirements and dispatch risks are recalculated.
-- Quality-related costs are reflected in the relevant insights.
-- Buyers see the updated released quantity for their order.
+### Prerequisites
 
-Every operational event contributes to a connected view of the factory.
-
-## 🛠️ Tech Stack
-
-| Layer            | Technology                          |
-| ---------------- | ----------------------------------- |
-| Frontend         | React 19, TypeScript, Vite          |
-| UI               | Tailwind CSS 4, Lucide Icons        |
-| Data Fetching    | TanStack Query                      |
-| Charts           | Recharts                            |
-| Backend          | Python, FastAPI, Pydantic           |
-| Database         | PostgreSQL                          |
-| ORM & Migrations | SQLAlchemy 2, Alembic               |
-| Authentication   | JWT, bcrypt, role-based permissions |
-| Image Analysis   | OpenCV                              |
-| Testing          | Pytest, Vitest, Playwright          |
-
-SQLite is supported as a local-development fallback. The project uses PostgreSQL for its main database setup.
-
-**Note:** LoomIQ is an independent application, not an Odoo addon, because the hackathon allowed the use of other technology stacks.
-
-## ⚙️ Installation and Setup
-
-### Requirements
-
-Make sure the following are installed:
-
-- Python 3.11 or later
-- Node.js 20 or later
-- PostgreSQL 14 or later (or use the documented SQLite fallback)
+- Python 3.11 or newer
+- Node.js 20 or newer
 - Git
+- PostgreSQL 14 or newer, if you do not want to use the local SQLite database
 
-### 1. Clone the repository
+### Windows setup (PowerShell)
 
-```bash
-git clone <your-github-repository-url>
-cd loomiq
-```
-
-Replace the URL with your actual GitHub repository URL.
-
-### 2. Set up the project
-
-```bash
-scripts/setup.sh
-```
-
-This script is intended to install dependencies, configure the database, run migrations, generate demo data and build the frontend.
-
-Follow any prompts or environment configuration instructions shown by the script.
-
-### 3. Start LoomIQ
-
-```bash
-scripts/run.sh
-```
-
-Open the application at:
-
-**http://localhost:8000**
-
-To run the backend and frontend in development mode:
-
-```bash
-scripts/run.sh dev
-```
-
-The API runs on port `8000`, and the frontend development server runs on port `5173`.
-
-### Manual Setup
-
-If you prefer to configure the application manually:
-
-**Backend**
-
-```bash
-cd backend
-pip install -r requirements.txt
-```
-
-Local development uses `backend/loomiq.db` by default, so PostgreSQL is not
-required. To use PostgreSQL instead, set `LOOMIQ_DATABASE_URL` before running
-the seed command and backend:
-
-```dotenv
-LOOMIQ_DATABASE_URL=postgresql+psycopg://loomiq:loomiq@localhost:5432/loomiq
-```
-
-Make sure the PostgreSQL server, database and user exist before selecting this
-option. In PowerShell, set the variable for the current terminal with:
+Clone the repository and enter the project directory:
 
 ```powershell
-$env:LOOMIQ_DATABASE_URL = "postgresql+psycopg://loomiq:loomiq@localhost:5432/loomiq"
+git clone https://github.com/Bavithran-G/LoomIQ.git
+Set-Location LoomIQ
 ```
 
-Generate demo data and apply migrations:
+Create and activate a Python virtual environment, then install the backend dependencies:
 
-```bash
-python -m app.seed --reset
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r backend\requirements.txt
 ```
 
-Start the backend:
+Install frontend dependencies and build the production UI:
 
-```bash
-uvicorn app.main:app --port 8000
-```
-
-**Frontend**
-
-Open another terminal:
-
-```bash
-cd frontend
+```powershell
+Set-Location frontend
 npm install
+npm run build
+Set-Location ..
+```
+
+The backend uses `backend\loomiq.db` (SQLite) by default for local development. Seed the demo database and start the API:
+
+```powershell
+Set-Location backend
+python -m app.seed --reset
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+> ⚠️ `--reset` drops and recreates the configured database before inserting demo data. Do not use it against a database containing data you need to keep.
+
+With the frontend build available, open **http://localhost:8000**. Interactive API documentation is at **http://localhost:8000/docs**.
+
+### Development mode
+
+Keep the backend running as above. In a second PowerShell terminal, start the Vite development server:
+
+```powershell
+Set-Location LoomIQ\frontend
 npm run dev
 ```
 
-API documentation is available at:
+Open **http://localhost:5173**. Vite forwards `/api` requests to the backend on port `8000`.
 
-http://localhost:8000/docs
+### Optional: PostgreSQL
 
-## 🔐 Demo Login Credentials
+Create a PostgreSQL database and user, then set the connection string in the PowerShell terminal used to run the seed command and backend:
 
-All demo accounts use the password:
-
-```text
-loomiq@2026
+```powershell
+$env:LOOMIQ_DATABASE_URL = "postgresql+psycopg://<user>:<password>@localhost:5432/loomiq"
 ```
 
-| Username           | Role                               |
-| ------------------ | ---------------------------------- |
-| `admin`            | Administrator                      |
-| `pm.ravi`          | Production Manager                 |
-| `store.meena`      | Storekeeper                        |
-| `qc.anitha`        | Quality Inspector                  |
-| `dispatch.karthik` | Dispatch Operator                  |
-| `finance.priya`    | Finance & Management               |
-| `buyer.cae`        | Buyer — Coimbatore Apparel Exports |
-| `buyer.nhl`        | Buyer — Nordic Home Linens         |
+Replace `<user>` and `<password>` with your PostgreSQL credentials. Run `python -m app.seed --reset` from `backend` to apply migrations and load demo data.
 
-These credentials are for demonstration only. Change default passwords and the secret key before any shared or production deployment.
+### Linux and macOS
 
-## 🏗️ Project Structure
+The repository includes Bash helper scripts. From the project root, run `scripts/setup.sh` for setup and `scripts/run.sh` to start the built application. To run the API and Vite separately for development, use `scripts/run.sh dev`. On Windows, use the PowerShell instructions above, or run the Bash scripts from WSL or Git Bash.
 
-```text
-loomiq/
-├── backend/
-│   ├── app/
-│   │   ├── models.py
-│   │   ├── security.py
-│   │   ├── seed.py
-│   │   ├── routers/
-│   │   └── services/
-│   ├── migrations/
-│   ├── tests/
-│   └── requirements.txt
-├── frontend/
-│   └── src/
-│       ├── pages/
-│       ├── components/
-│       ├── lib/
-│       └── __tests__/
-├── e2e/
-│   └── journeys.py
-├── docs/
-│   └── IMPLEMENTATION_STATUS.md
-├── scripts/
-│   ├── setup.sh
-│   └── run.sh
-└── README.md
-```
+## 🔐 Demo accounts
 
-### Main Backend Services
+All seeded demo accounts use the password `loomiq@2026`.
 
-- `inventory.py` – Stock, receipts, reservations and material consumption.
-- `orders.py` – Order lifecycle and material readiness.
-- `production.py` – Production jobs, machine capacity and job transitions.
-- `quality.py` – Roll inspection, rework and quality decisions.
-- `dispatch.py` – Shipment eligibility and dispatch confirmation.
-- `costing.py` – Estimated and recorded production costs.
-- `risk.py` – Rule-based production delay assessment.
-- `impact.py` – Quality impact analysis.
-- `simulator.py` – What-if production scenarios.
-- `dashboard.py` – Operational insights and reporting.
-- `cv_inspect.py` – Classical computer-vision image analysis.
+| Username | Role |
+| --- | --- |
+| `admin` | Administrator |
+| `pm.ravi` | Production Manager |
+| `store.meena` | Storekeeper |
+| `qc.anitha` | Quality Inspector |
+| `dispatch.karthik` | Dispatch Operator |
+| `finance.priya` | Finance & Management |
+| `buyer.cae` | Buyer — Coimbatore Apparel Exports |
+| `buyer.nhl` | Buyer — Nordic Home Linens |
 
-## 📏 Important Business Rules
+> 🔒 These credentials and the default development secret are for local demonstrations only. Set a strong `LOOMIQ_SECRET_KEY`, replace demo passwords and review deployment settings before exposing the application to other users.
 
-- **Stock is tracked by material lot.** Receipts, reservations, consumption and stock movements maintain inventory history.
-- **Material is consumed through production events.** Insufficient stock must prevent an invalid completion.
-- **Production follows explicit state transitions.** Orders progress through business events rather than arbitrary status changes.
-- **Machine capacity is enforced.** Jobs must respect machine availability, shift capacity and breakdown or maintenance states.
-- **Quality decisions control dispatch.** Rejected rolls cannot be shipped, and rework requires the appropriate subsequent inspection.
-- **Partial dispatch is supported.** Only eligible rolls belonging to the correct order may be shipped.
-- **Costs are linked to source events.** Reprocessing an existing event should not duplicate its cost.
-- **Access is role-based.** Buyers are restricted to their own permitted information, and public QR verification does not expose internal factory records.
+## 🧪 Tests
 
-## 🧪 Testing
+Run the frontend unit tests:
 
-### Backend Tests
-
-```bash
-cd backend
-pytest -q
-```
-
-The test suite is intended to cover API behaviour, authentication and core business rules using PostgreSQL and the configured test database.
-
-### Frontend Tests
-
-```bash
-cd frontend
+```powershell
+Set-Location frontend
 npm test
 ```
 
-### End-to-End Tests
+For the browser journeys, install Playwright and its Chromium browser if needed. Keep both the backend and frontend development servers running, then use a separate terminal with the project virtual environment activated:
 
-Start the backend and frontend, then run the browser journeys using the repository's documented environment and seed instructions:
-
-```bash
+```powershell
+python -m pip install playwright
+playwright install chromium
+Set-Location backend
 python -m app.seed --reset
-python ../e2e/journeys.py
+python ..\e2e\journeys.py
 ```
 
-Run the end-to-end command from the directory expected by the repository configuration. These journeys require the application servers and browser dependencies to be available.
+The browser journeys exercise the running application and use freshly seeded demo data. The seed reset warning above applies.
 
-## ⚠️ Limitations
+## 📂 Project layout
 
-- **Quality inspection:** The current OpenCV implementation is an experimental anomaly-detection baseline, not a trained or validated fabric-defect model. It reports heuristic scores rather than probabilities and requires a human inspector's decision.
-- **Machine monitoring:** Machine status is derived from job records and manual state changes. Live IoT sensor integration is not available.
-- **Production risk:** The delay-risk engine uses deterministic rules, not a trained predictive model.
-- **What-if simulation:** The simulator uses simplified shift-based assumptions. Its results are estimates, not guaranteed production outcomes.
-- **Cost calculations:** Demo costs use configured standard rates and synthetic demo data; they are not actual mill financial figures.
-- **Security:** The development secret key and demo credentials must be replaced before shared deployment.
+```text
+LoomIQ/
+├── backend/
+│   ├── app/
+│   │   ├── routers/
+│   │   └── services/
+│   ├── migrations/
+│   └── requirements.txt
+├── frontend/
+│   └── src/
+│       ├── components/
+│       ├── lib/
+│       ├── pages/
+│       └── __tests__/
+├── e2e/
+├── docs/
+└── scripts/
+```
 
-## 🔧 Environment Variables
+## 📌 Current limitations
 
-| Variable               | Purpose                                                       |
-| ---------------------- | ------------------------------------------------------------- |
-| `LOOMIQ_DATABASE_URL`  | Database connection URL                                       |
-| `LOOMIQ_SECRET_KEY`    | Secret used for authentication; replace the development value |
-| `LOOMIQ_STORAGE_DIR`   | Storage directory for inspection images                       |
-| `LOOMIQ_MAX_UPLOAD_MB` | Maximum image upload size                                     |
-| `LOOMIQ_FRONTEND_URL`  | Optional frontend URL for generated QR links                  |
+- Fabric image inspection uses a classical computer-vision baseline, not a trained defect-detection model; it has been validated on synthetic images only.
+- Machine status is based on application records; there is no IoT or sensor integration.
+- The application does not send email or external notifications.
+- There is no self-service password reset; administrators manage temporary passwords.
+- Packing lists are printable pages rather than generated PDF files.
 
-Do not commit `.env` files, passwords, database credentials or production secrets to GitHub.
+---
 
-## 🎯 Project Goal
-
-LoomIQ aims to make textile manufacturing more connected, transparent and easier to manage.
-
-By linking inventory, production, quality, dispatch and cost intelligence, the platform helps factory teams identify problems earlier, trace defects, track buyer orders and make better operational decisions.
-
-**LoomIQ — Every roll traceable. Every order visible. Every decision informed.** 🧵
+**LoomIQ** — connecting textile operations with clear, traceable insight. 🧵
