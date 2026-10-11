@@ -77,9 +77,11 @@ function PlanDispatch({ o, onClose }: { o: ReadyOrder; onClose: () => void }) {
   const toggle = (id: number) => setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
   return (
     <Modal open wide onClose={onClose} title={`Plan dispatch for ${o.order_no}`}
-      footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="primary" disabled={sel.size === 0} loading={m.isPending} onClick={() => m.mutate()}>Plan dispatch of {sel.size} rolls</Button></>}>
+      footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="primary" disabled={sel.size === 0 || f.planned_date < isoDay()} loading={m.isPending} onClick={() => m.mutate()}>Plan dispatch of {sel.size} rolls</Button></>}>
       <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="Planned date">{(id) => <Input id={id} type="date" value={f.planned_date} onChange={(e) => setF({ ...f, planned_date: e.target.value })} />}</Field>
+        <Field label="Planned date" error={f.planned_date < isoDay() ? 'Planned dispatch date cannot be in the past' : null}>
+          {(id) => <Input id={id} type="date" min={isoDay()} value={f.planned_date} onChange={(e) => setF({ ...f, planned_date: e.target.value })} />}
+        </Field>
         <Field label="Vehicle number" hint="Needed before confirming">{(id) => <Input id={id} value={f.vehicle_no} onChange={(e) => setF({ ...f, vehicle_no: e.target.value })} placeholder="TN-33-AB-1234" />}</Field>
         <Field label="Transporter">{(id) => <Input id={id} value={f.transporter} onChange={(e) => setF({ ...f, transporter: e.target.value })} />}</Field>
       </div>

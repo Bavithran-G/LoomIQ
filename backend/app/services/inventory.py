@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from ..models import (CostEntry, Material, MaterialLot, OrderReservation, PurchaseLine, SalesOrder,
                       StockMovement, User)
-from .core import EPS, BusinessError, NotFound, log_event, r3
+from .core import EPS, BusinessError, NotFound, log_event, r3, validate_event_date
 
 
 def _locked_lots(db: Session, material_id: int):
@@ -50,6 +50,7 @@ def receive_goods(db: Session, *, material_id: int, qty: float, unit_cost: float
         raise BusinessError("Received quantity must be greater than zero", 422)
     if unit_cost < 0:
         raise BusinessError("Unit cost cannot be negative", 422)
+    validate_event_date(receipt_date, "Receipt date")
     m = db.get(Material, material_id)
     if not m:
         raise NotFound("Material")
@@ -95,6 +96,59 @@ def adjust_stock(db: Session, *, lot_id: int, delta: float, reason: str, user: U
     log_event(db, "stock", lot.material_id, "stock_adjust",
               f"Stock adjustment {delta:+g} on lot {lot.lot_number}: {reason.strip()}",
               severity="warning" if delta < 0 else "info", user=user)
+    return lot
+
+
+DEFECT_REASONS = [
+    "Contamination",
+    "Damaged material",
+    "Failed quality inspection",
+    "Moisture / mildew damage",
+    "Storage damage",
+    "Supplier defect",
+    "Other defect",
+]
+
+
+def defective_writeoff(db: Session, *, lot_id: int, qty: float, defect_reason: str,
+                       remarks: str = "", user: User | None) -> MaterialLot:
+    """Write off defective material from a lot.
+
+    - qty must be positive (will be subtracted from available stock).
+    - defect_reason is required.
+    - Cannot reduce available stock below zero or touch reserved stock.
+    - Creates a StockMovement with movement_type='defect_writeoff' for traceability.
+    - Logs an Event so the audit trail shows who wrote it off and why.
+    """
+    if not defect_reason.strip():
+        raise BusinessError("A defect reason is required for defective stock write-off", 422)
+    if qty <= 0:
+        raise BusinessError("Defective quantity must be greater than zero", 422)
+    lot = db.get(MaterialLot, lot_id, with_for_update=True)
+    if not lot:
+        raise NotFound("Lot")
+    if qty > lot.qty_available + EPS:
+        avail = lot.qty_available
+        raise BusinessError(
+            f"Cannot write off {qty:g} — only {avail:g} is available in lot {lot.lot_number}. "
+            f"Reserved stock ({lot.qty_reserved:g}) cannot be written off without releasing reservations first.",
+            409,
+        )
+    note = defect_reason.strip()
+    if remarks.strip():
+        note = f"{note} — {remarks.strip()}"
+    lot.qty_available = r3(lot.qty_available - qty)
+    db.add(StockMovement(
+        material_id=lot.material_id, lot_id=lot.id,
+        movement_type="defect_writeoff", qty=r3(-qty),
+        reason=f"Defective write-off: {note}",
+        user_id=user.id if user else None,
+    ))
+    log_event(
+        db, "stock", lot.material_id, "defect_writeoff",
+        f"Defective write-off {qty:g} from lot {lot.lot_number}: {note}",
+        severity="warning", user=user,
+    )
     return lot
 
 

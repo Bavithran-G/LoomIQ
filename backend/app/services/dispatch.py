@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from ..models import (Dispatch, DispatchLine, DispatchStatus, OrderStatus, Roll, RollEvent, RollQuality,
                       RollStage, SalesOrder, User)
-from .core import EPS, BusinessError, NotFound, log_event, next_number
+from .core import EPS, BusinessError, NotFound, log_event, next_number, validate_planned_date
 from .orders import order_metrics
 
 
@@ -46,6 +46,7 @@ def eligible_rolls(db: Session, order: SalesOrder) -> list[Roll]:
 
 def create_dispatch(db: Session, *, order_id: int, roll_ids: list[int], planned_date: date, vehicle_no: str,
                     transporter: str, user: User) -> Dispatch:
+    validate_planned_date(planned_date, "Planned date")
     order = db.get(SalesOrder, order_id)
     if not order:
         raise NotFound("Order")

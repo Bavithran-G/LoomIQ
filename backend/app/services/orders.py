@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from ..models import (Buyer, Dispatch, DispatchStatus, FabricSpec, JobStatus, OrderStatus, Priority,
                       ProductionJob, RollQuality, RollStage, SalesOrder, User)
 from . import inventory
-from .core import EPS, BusinessError, NotFound, log_event, next_number, r3
+from .core import EPS, BusinessError, NotFound, log_event, next_number, r3, validate_event_date, validate_planned_date
 
 # Allowed manual transitions. in_production and completed are reached through business events
 # (first job started / final dispatch confirmed), never by editing a status field.
@@ -109,6 +109,8 @@ def _validate(quantity: float, order_date: date, promised_date: date):
 
 
 def create_order(db: Session, data: dict, user: User) -> SalesOrder:
+    validate_event_date(data["order_date"], "Order date")
+    validate_planned_date(data["promised_date"], "Promised delivery date")
     _validate(data["quantity"], data["order_date"], data["promised_date"])
     if not db.get(Buyer, data["buyer_id"]):
         raise NotFound("Buyer")
@@ -142,6 +144,10 @@ def create_order(db: Session, data: dict, user: User) -> SalesOrder:
 def update_order(db: Session, order: SalesOrder, data: dict, user: User) -> SalesOrder:
     if order.status in (OrderStatus.completed, OrderStatus.cancelled):
         raise BusinessError(f"A {order.status.value} order cannot be edited")
+    if "order_date" in data and data["order_date"] != order.order_date:
+        validate_event_date(data["order_date"], "Order date")
+    if "promised_date" in data and data["promised_date"] != order.promised_date:
+        validate_planned_date(data["promised_date"], "Promised delivery date")
     locked_fields = {"quantity", "fabric_spec_id", "buyer_id", "colour", "buyer_po", "order_date"}
     changes = []
     for k, v in data.items():

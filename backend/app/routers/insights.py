@@ -14,7 +14,7 @@ from ..models import (Buyer, Dispatch, DispatchStatus, Event, FabricSpec, Fabric
 from ..security import create_token, current_user, hash_password, permissions_for, require, verify_password
 from ..serializers import dispatch_out, order_buyer_out, user_out
 from ..services import costing, dashboard, risk, simulator
-from ..services.core import BusinessError, NotFound, log_event, money, next_number, today
+from ..services.core import BusinessError, NotFound, log_event, money, next_number, today, today_local
 from ..services.orders import create_order as svc_create_order, order_metrics
 
 router = APIRouter(prefix="/api", tags=["insights"])
@@ -292,7 +292,7 @@ def portal_create_order(body: BuyerOrderIn, db: Session = Depends(get_db),
     """Buyers create their own orders. buyer_id is always derived from the authenticated session."""
     from ..services.orders import create_order as svc_create_order
     buyer = _ensure_buyer(db, user)
-    order_date = today()
+    order_date = today_local()
     if body.promised_date <= order_date:
         raise BusinessError("Delivery date must be in the future", 422)
     data = {

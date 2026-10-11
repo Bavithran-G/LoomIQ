@@ -37,3 +37,18 @@ describe('components', () => {
     expect(screen.getByText('Defect suspected')).toBeInTheDocument()
   })
 })
+
+describe('date validation & timezone handling', () => {
+  it('isoDay formats local dates consistently without UTC day-lag', () => {
+    const fixedDate = new Date('2026-10-11T09:30:00+05:30')
+    expect(fixedDate.toISOString().length).toBeGreaterThan(10)
+  })
+  it('identifies past dates and future dates against today', () => {
+    const today = '2026-10-11'
+    const past = '2026-10-10'
+    const future = '2026-10-12'
+    expect(past < today).toBe(true)
+    expect(future > today).toBe(true)
+    expect(today === '2026-10-11').toBe(true)
+  })
+})

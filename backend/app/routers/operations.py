@@ -12,7 +12,8 @@ from ..models import (Downtime, JobStatus, Machine, Material, MaterialLot, Produ
 from ..security import require
 from ..serializers import job_out, lot_out, machine_out, movement_out
 from ..services import inventory, production
-from ..services.core import NotFound, today
+from ..services.core import NotFound, today, validate_event_date, validate_planned_date
+from ..services.inventory import DEFECT_REASONS
 
 router = APIRouter(prefix="/api", tags=["operations"])
 
@@ -86,6 +87,7 @@ def suppliers(db: Session = Depends(get_db), _: User = Depends(require("inventor
 
 @router.post("/inventory/receipts", status_code=201)
 def receive(body: ReceiptIn, db: Session = Depends(get_db), user: User = Depends(require("inventory.manage"))):
+    # date validation is enforced inside inventory.receive_goods via validate_event_date
     lot = inventory.receive_goods(db, user=user, **body.model_dump())
     db.commit()
     return lot_out(lot)
@@ -94,6 +96,33 @@ def receive(body: ReceiptIn, db: Session = Depends(get_db), user: User = Depends
 @router.post("/inventory/adjustments")
 def adjust(body: AdjustIn, db: Session = Depends(get_db), user: User = Depends(require("inventory.manage"))):
     lot = inventory.adjust_stock(db, lot_id=body.lot_id, delta=body.delta, reason=body.reason, user=user)
+    db.commit()
+    return lot_out(lot)
+
+
+class DefectiveWriteoffIn(BaseModel):
+    lot_id: int
+    qty: float = Field(gt=0)
+    defect_reason: str = Field(min_length=3, max_length=120)
+    remarks: str = Field(default="", max_length=400)
+
+
+@router.get("/inventory/defect-reasons")
+def defect_reasons(_: User = Depends(require("inventory.view"))):
+    return DEFECT_REASONS
+
+
+@router.post("/inventory/defective-writeoff", status_code=201)
+def defective_writeoff(body: DefectiveWriteoffIn, db: Session = Depends(get_db),
+                       user: User = Depends(require("inventory.manage"))):
+    """Write off defective stock from a material lot.
+    Creates a traceable StockMovement (type=defect_writeoff) and an audit Event.
+    Decreases qty_available only; never touches reserved or consumed quantities.
+    """
+    lot = inventory.defective_writeoff(
+        db, lot_id=body.lot_id, qty=body.qty,
+        defect_reason=body.defect_reason, remarks=body.remarks, user=user,
+    )
     db.commit()
     return lot_out(lot)
 
@@ -159,6 +188,7 @@ def jobs(status: str | None = None, stage: str | None = None, order_id: int | No
 
 @router.post("/production/jobs", status_code=201)
 def create_job(body: JobIn, db: Session = Depends(get_db), user: User = Depends(require("production.manage"))):
+    validate_planned_date(body.planned_date, "Planned date")
     j = production.create_job(db, body.model_dump(), user)
     db.commit()
     return job_out(j)
@@ -227,7 +257,9 @@ def machine_state(mid: int, body: MachineStateIn, db: Session = Depends(get_db),
 
 @router.post("/production/downtime", status_code=201)
 def downtime(body: DowntimeIn, db: Session = Depends(get_db), user: User = Depends(require("production.manage"))):
+    occurred = body.occurred_on or today()
+    validate_event_date(occurred, "Downtime date")
     d = production.record_downtime(db, machine_id=body.machine_id, minutes=body.minutes, reason=body.reason,
-                                   job_id=body.job_id, occurred_on=body.occurred_on or today(), user=user)
+                                   job_id=body.job_id, occurred_on=occurred, user=user)
     db.commit()
     return {"id": d.id}

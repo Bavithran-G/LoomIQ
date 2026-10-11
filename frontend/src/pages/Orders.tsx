@@ -106,7 +106,10 @@ export function OrderForm({ onClose, onSaved, initial }: { onClose: () => void; 
     if (!f.fabric_spec_id) e.fabric_spec_id = 'Choose a fabric'
     if (!f.colour.trim()) e.colour = 'Enter the colour'
     if (!(f.quantity > 0)) e.quantity = 'Quantity must be more than zero'
+    if (!initial && f.order_date !== isoDay()) e.order_date = 'Order date must be today'
+    if (f.order_date > isoDay()) e.order_date = 'Order date cannot be in the future'
     if (f.promised_date < f.order_date) e.promised_date = 'Must be on or after the order date'
+    if (f.promised_date < isoDay()) e.promised_date = 'Promised delivery date cannot be in the past'
     setErrs(e)
     return Object.keys(e).length === 0
   }
@@ -121,8 +124,8 @@ export function OrderForm({ onClose, onSaved, initial }: { onClose: () => void; 
         <Field label="Colour" error={errs.colour}>{(id) => <Input id={id} disabled={!draft} value={f.colour} onChange={(e) => set('colour', e.target.value)} placeholder="e.g. Navy blue" />}</Field>
         <Field label="Quantity (metres)" error={errs.quantity}>{(id) => <Input id={id} disabled={!draft} type="number" min={1} step={1} value={f.quantity} onChange={(e) => set('quantity', Number(e.target.value))} />}</Field>
         <Field label="Priority">{(id) => <Select id={id} value={f.priority} onChange={(e) => set('priority', e.target.value)}>{['low', 'normal', 'high', 'urgent'].map((p) => <option key={p}>{p}</option>)}</Select>}</Field>
-        <Field label="Order date">{(id) => <Input id={id} disabled={!draft} type="date" value={f.order_date} onChange={(e) => set('order_date', e.target.value)} />}</Field>
-        <Field label="Promised delivery" error={errs.promised_date}>{(id) => <Input id={id} type="date" value={f.promised_date} onChange={(e) => set('promised_date', e.target.value)} />}</Field>
+        <Field label="Order date" error={errs.order_date}>{(id) => <Input id={id} disabled={!draft} type="date" min={initial ? undefined : isoDay()} max={isoDay()} value={f.order_date} onChange={(e) => set('order_date', e.target.value)} />}</Field>
+        <Field label="Promised delivery" error={errs.promised_date}>{(id) => <Input id={id} type="date" min={f.order_date || isoDay()} value={f.promised_date} onChange={(e) => set('promised_date', e.target.value)} />}</Field>
         <Field label="Notes (visible to buyer)" className="sm:col-span-2">{(id) => <Textarea id={id} value={f.notes} onChange={(e) => set('notes', e.target.value)} />}</Field>
         <Field label="Internal notes (mill only)" className="sm:col-span-2">{(id) => <Textarea id={id} value={f.internal_notes} onChange={(e) => set('internal_notes', e.target.value)} />}</Field>
       </div>

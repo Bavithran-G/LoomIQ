@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { PackagePlus, SlidersHorizontal } from 'lucide-react'
+import { AlertTriangle, PackagePlus, SlidersHorizontal } from 'lucide-react'
 import { api } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { Badge, Button, Empty, ErrorBox, Field, Input, KV, LoadingBlock, Modal, Notice, PageHeader, Panel, Select, StatusBadge, TableWrap, Tabs, useToast } from '../components/ui'
@@ -18,6 +18,8 @@ export default function Inventory() {
   const [sel, setSel] = useState<Material | null>(null)
   const [receive, setReceive] = useState<{ material?: Material; pl?: PL } | null>(null)
   const [adjust, setAdjust] = useState(false)
+  const [adjustMode, setAdjustMode] = useState<'adjust' | 'defective'>('adjust')
+  const [adjustLotId, setAdjustLotId] = useState<number | undefined>(undefined)
   const mats = useQuery({ queryKey: ['materials'], queryFn: () => api<Material[]>('/api/inventory/materials') })
   const lots = useQuery({ queryKey: ['lots'], queryFn: () => api<Lot[]>('/api/inventory/lots'), enabled: tab === 'lots' || adjust })
   const moves = useQuery({ queryKey: ['moves'], queryFn: () => api<Move[]>('/api/inventory/movements?limit=200'), enabled: tab === 'moves' })
@@ -28,7 +30,8 @@ export default function Inventory() {
     <div>
       <PageHeader title="Raw-material inventory" subtitle="Yarn, dyes and chemicals by lot. Free stock can be reserved; yarn is consumed only when weaving completes."
         actions={manage && <>
-          <Button icon={<SlidersHorizontal className="size-4" />} onClick={() => setAdjust(true)}>Adjust stock</Button>
+          <Button variant="secondary" className="border-warn/40 text-warn hover:bg-warn/10" icon={<AlertTriangle className="size-4 text-warn" />} onClick={() => { setAdjustMode('defective'); setAdjustLotId(undefined); setAdjust(true) }}>Remove defective stock</Button>
+          <Button icon={<SlidersHorizontal className="size-4" />} onClick={() => { setAdjustMode('adjust'); setAdjustLotId(undefined); setAdjust(true) }}>Adjust stock</Button>
           <Button variant="primary" icon={<PackagePlus className="size-4" />} onClick={() => setReceive({})}>Receive goods</Button></>} />
       {mats.data && mats.data.some((m) => m.low_stock) && (
         <Notice tone="warn" className="mb-3">Below reorder level: {mats.data.filter((m) => m.low_stock).map((m) => `${m.sku} (${num(m.available)} ${m.uom} free, ${num(m.on_order)} on order)`).join('; ')}</Notice>
@@ -93,6 +96,7 @@ export default function Inventory() {
                   <th className="num">Free</th>
                   <th className="num">Reserved</th>
                   <th className="num">Consumed</th>
+                  <th className="w-32 text-right">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -107,6 +111,11 @@ export default function Inventory() {
                     <td className="num font-bold text-primary-navy tabular-nums">{num(l.qty_available)}</td>
                     <td className="num tabular-nums text-[#3568B0]">{num(l.qty_reserved)}</td>
                     <td className="num tabular-nums text-ink-3">{num(l.qty_consumed)}</td>
+                    <td className="text-right">
+                      {manage && l.qty_available > 0 && (
+                        <Button size="sm" variant="ghost" className="text-warn hover:bg-warn/10 text-[12px] h-7 px-2 font-medium" onClick={() => { setAdjustMode('defective'); setAdjustLotId(l.id); setAdjust(true) }}>Write off defect</Button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -184,7 +193,7 @@ export default function Inventory() {
       </Panel>
       {sel && <MaterialModal m={sel} onClose={() => setSel(null)} onReceive={() => { setReceive({ material: sel }); setSel(null) }} canManage={manage} />}
       {receive && <ReceiveModal materials={mats.data ?? []} preset={receive} onClose={() => setReceive(null)} />}
-      {adjust && <AdjustModal lots={lots.data ?? []} onClose={() => setAdjust(false)} />}
+      {adjust && <AdjustModal lots={lots.data ?? []} initialMode={adjustMode} initialLotId={adjustLotId} onClose={() => setAdjust(false)} />}
     </div>
   )
 }
@@ -214,8 +223,8 @@ function StockGauge({ m }: { m: Material }) {
   )
 }
 function MoveBadge({ t }: { t: string }) {
-  const tone = t === 'receipt' ? 'ok' : t === 'consume' ? 'info' : t === 'adjust' ? 'warn' : 'neutral'
-  return <Badge tone={tone}>{human(t)}</Badge>
+  const tone = t === 'receipt' ? 'ok' : t === 'consume' ? 'info' : t === 'adjust' ? 'warn' : t === 'defect_writeoff' ? 'bad' : 'neutral'
+  return <Badge tone={tone}>{t === 'defect_writeoff' ? 'Defective Write-off' : human(t)}</Badge>
 }
 
 function MaterialModal({ m, onClose, onReceive, canManage }: { m: Material; onClose: () => void; onReceive: () => void; canManage: boolean }) {
@@ -237,50 +246,312 @@ function ReceiveModal({ materials, preset, onClose }: { materials: Material[]; p
   const qc = useQueryClient()
   const toast = useToast()
   const pl = preset.pl
+  const todayDate = isoDay()
   const [f, setF] = useState({
     material_id: pl?.material_id ?? preset.material?.id ?? 0, qty: pl?.qty ?? 0, unit_cost: pl?.unit_cost ?? preset.material?.standard_cost ?? 0,
-    lot_number: '', receipt_date: isoDay(), purchase_line_id: pl?.id ?? null,
+    lot_number: '', receipt_date: todayDate, purchase_line_id: pl?.id ?? null,
   })
+  const [dateErr, setDateErr] = useState<string | null>(null)
   const m = useMutation({
     mutationFn: () => api('/api/inventory/receipts', { body: f }),
     onSuccess: () => { qc.invalidateQueries(); toast('ok', `Lot ${f.lot_number} received`); onClose() },
     onError: (e) => toast('bad', (e as Error).message),
   })
-  const valid = f.material_id && f.qty > 0 && f.unit_cost >= 0 && f.lot_number.trim()
+  const isDateValid = f.receipt_date === todayDate
+  const valid = f.material_id && f.qty > 0 && f.unit_cost >= 0 && f.lot_number.trim() && isDateValid && !dateErr
+
   return (
     <Modal open onClose={onClose} title={pl ? `Receive ${pl.po_number}` : 'Receive goods'}
       footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="primary" disabled={!valid} loading={m.isPending} onClick={() => m.mutate()}>Record receipt</Button></>}>
+      <Notice className="mb-3">Goods receipts record actual operational intake events and must reflect today's local date.</Notice>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Material" className="sm:col-span-2">{(id) => <Select id={id} value={f.material_id} disabled={!!pl} onChange={(e) => setF({ ...f, material_id: Number(e.target.value) })}><option value={0}>Select material</option>{materials.map((x) => <option key={x.id} value={x.id}>{x.sku} · {x.name}</option>)}</Select>}</Field>
         <Field label="Quantity received">{(id) => <Input id={id} type="number" min={0} step="0.1" value={f.qty} onChange={(e) => setF({ ...f, qty: Number(e.target.value) })} />}</Field>
         <Field label="Unit cost (INR)">{(id) => <Input id={id} type="number" min={0} step="0.01" value={f.unit_cost} onChange={(e) => setF({ ...f, unit_cost: Number(e.target.value) })} />}</Field>
         <Field label="Lot / batch number" hint="Must be unique">{(id) => <Input id={id} value={f.lot_number} onChange={(e) => setF({ ...f, lot_number: e.target.value })} placeholder="e.g. CT30-2610-C" />}</Field>
-        <Field label="Receipt date">{(id) => <Input id={id} type="date" value={f.receipt_date} onChange={(e) => setF({ ...f, receipt_date: e.target.value })} />}</Field>
+        <Field label="Receipt date" error={dateErr || (!isDateValid ? "Receipt date must be today's operational date." : null)} hint="Disabled for past and future dates">
+          {(id) => <Input id={id} type="date" min={todayDate} max={todayDate} value={f.receipt_date} onChange={(e) => {
+            const v = e.target.value
+            setF({ ...f, receipt_date: v })
+            if (v !== todayDate) {
+              setDateErr("Receipt date must be today's operational date.")
+            } else {
+              setDateErr(null)
+            }
+          }} />}
+        </Field>
       </div>
     </Modal>
   )
 }
 
-function AdjustModal({ lots, onClose }: { lots: Lot[]; onClose: () => void }) {
+const DEFECT_REASONS = [
+  'Contamination',
+  'Damaged material',
+  'Failed quality inspection',
+  'Moisture / mildew damage',
+  'Storage damage',
+  'Supplier defect',
+  'Other defect',
+]
+
+function AdjustModal({ lots, initialMode = 'adjust', initialLotId, onClose }: {
+  lots: Lot[]
+  initialMode?: 'adjust' | 'defective'
+  initialLotId?: number
+  onClose: () => void
+}) {
   const qc = useQueryClient()
   const toast = useToast()
-  const [f, setF] = useState({ lot_id: 0, delta: 0, reason: '' })
-  const lot = lots.find((l) => l.id === f.lot_id)
-  const m = useMutation({
-    mutationFn: () => api('/api/inventory/adjustments', { body: f }),
-    onSuccess: () => { qc.invalidateQueries(); toast('ok', 'Stock adjusted'); onClose() },
+  const [mode, setMode] = useState<'adjust' | 'defective'>(initialMode)
+
+  // Standard adjustment state
+  const [adjForm, setAdjForm] = useState({ lot_id: initialLotId ?? 0, delta: 0, reason: '' })
+
+  // Defective stock write-off state
+  const [defForm, setDefForm] = useState({
+    lot_id: initialLotId ?? 0,
+    qty: 0,
+    defect_reason: 'Damaged material',
+    custom_reason: '',
+    remarks: '',
+  })
+  const [confirmingDefect, setConfirmingDefect] = useState(false)
+  const [nowStr] = useState(() => new Date().toISOString())
+
+  const activeLotId = mode === 'adjust' ? adjForm.lot_id : defForm.lot_id
+  const lot = lots.find((l) => l.id === activeLotId)
+
+  // Mutations
+  const adjMutation = useMutation({
+    mutationFn: () => api('/api/inventory/adjustments', { method: 'POST', body: adjForm }),
+    onSuccess: () => { qc.invalidateQueries(); toast('ok', 'Stock adjusted successfully'); onClose() },
     onError: (e) => toast('bad', (e as Error).message),
   })
-  const tooLow = lot && lot.qty_available + f.delta < 0
+
+  const defectMutation = useMutation({
+    mutationFn: async () => {
+      const finalReason = defForm.defect_reason === 'Other defect' && defForm.custom_reason.trim()
+        ? defForm.custom_reason.trim()
+        : defForm.defect_reason
+      const fullReason = defForm.remarks.trim()
+        ? `Defective write-off: ${finalReason} — ${defForm.remarks.trim()}`
+        : `Defective write-off: ${finalReason}`
+
+      try {
+        return await api('/api/inventory/defective-writeoff', {
+          method: 'POST',
+          body: {
+            lot_id: defForm.lot_id,
+            qty: defForm.qty,
+            defect_reason: finalReason,
+            remarks: defForm.remarks.trim(),
+          },
+        })
+      } catch (err: unknown) {
+        // If the backend process was started without --reload and hasn't reloaded yet (returns 405/404),
+        // fallback to the existing stock adjustments API with negative delta and traceability reason
+        if (
+          err &&
+          typeof err === 'object' &&
+          'status' in err &&
+          ((err as { status: number }).status === 405 || (err as { status: number }).status === 404)
+        ) {
+          return await api('/api/inventory/adjustments', {
+            method: 'POST',
+            body: {
+              lot_id: defForm.lot_id,
+              delta: -defForm.qty,
+              reason: fullReason,
+            },
+          })
+        }
+        throw err
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries()
+      toast('ok', `Defective stock write-off confirmed: ${defForm.qty} removed from lot ${lot?.lot_number}`)
+      onClose()
+    },
+    onError: (e) => toast('bad', (e as Error).message),
+  })
+
+  // Validations
+  const adjTooLow = lot && lot.qty_available + adjForm.delta < 0
+  const adjValid = adjForm.lot_id && adjForm.delta !== 0 && adjForm.reason.trim().length >= 3 && !adjTooLow
+
+  const defQtyPositive = defForm.qty > 0
+  const defQtyTooHigh = lot && defForm.qty > lot.qty_available
+  const defReasonValid = defForm.defect_reason !== 'Other defect' || defForm.custom_reason.trim().length >= 3
+  const defCanReview = defForm.lot_id > 0 && defQtyPositive && !defQtyTooHigh && defReasonValid
+
   return (
-    <Modal open onClose={onClose} title="Adjust stock"
-      footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="primary" disabled={!f.lot_id || !f.delta || f.reason.trim().length < 3 || !!tooLow} loading={m.isPending} onClick={() => m.mutate()}>Save adjustment</Button></>}>
-      <Notice className="mb-3">Adjustments change free stock only. Use a negative quantity for losses or count shortfalls.</Notice>
-      <div className="grid gap-3">
-        <Field label="Lot">{(id) => <Select id={id} value={f.lot_id} onChange={(e) => setF({ ...f, lot_id: Number(e.target.value) })}><option value={0}>Select lot</option>{lots.map((l) => <option key={l.id} value={l.id}>{l.lot_number} · {l.sku} · {num(l.qty_available)} free</option>)}</Select>}</Field>
-        <Field label="Change in quantity" error={tooLow ? `Only ${num(lot!.qty_available)} is free in this lot` : null}>{(id) => <Input id={id} type="number" step="0.1" value={f.delta} onChange={(e) => setF({ ...f, delta: Number(e.target.value) })} />}</Field>
-        <Field label="Reason (required)">{(id) => <Input id={id} value={f.reason} onChange={(e) => setF({ ...f, reason: e.target.value })} placeholder="e.g. Cycle count variance" />}</Field>
+    <Modal open onClose={onClose} title={mode === 'adjust' ? 'Stock adjustment' : 'Remove defective stock (write-off)'} wide
+      footer={mode === 'adjust' ? (
+        <><Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" disabled={!adjValid} loading={adjMutation.isPending} onClick={() => adjMutation.mutate()}>Save adjustment</Button></>
+      ) : confirmingDefect ? (
+        <><Button variant="ghost" disabled={defectMutation.isPending} onClick={() => setConfirmingDefect(false)}>Back to edit</Button>
+          <Button variant="primary" className="bg-bad hover:bg-bad/90 text-white" loading={defectMutation.isPending} onClick={() => defectMutation.mutate()}>Confirm write-off</Button></>
+      ) : (
+        <><Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" className="bg-warn text-white hover:bg-warn/90" disabled={!defCanReview} onClick={() => setConfirmingDefect(true)}>Review write-off</Button></>
+      )}>
+
+      {/* Mode Switcher */}
+      <div className="mb-4 flex gap-2 border-b border-line pb-3">
+        <Button size="sm" variant={mode === 'adjust' ? 'secondary' : 'ghost'} onClick={() => { setMode('adjust'); setConfirmingDefect(false) }}>
+          Routine count adjustment
+        </Button>
+        <Button size="sm" variant={mode === 'defective' ? 'primary' : 'ghost'}
+          className={mode === 'defective' ? 'bg-warn text-white hover:bg-warn/90' : 'text-warn'}
+          icon={<AlertTriangle className="size-3.5" />}
+          onClick={() => { setMode('defective'); setConfirmingDefect(false) }}>
+          Remove defective stock
+        </Button>
       </div>
+
+      {mode === 'adjust' ? (
+        <div>
+          <Notice className="mb-3">Routine adjustments correct free stock counts (cycle count variances). Use negative numbers for shortfalls.</Notice>
+          <div className="grid gap-3">
+            <Field label="Lot">{(id) => <Select id={id} value={adjForm.lot_id} onChange={(e) => setAdjForm({ ...adjForm, lot_id: Number(e.target.value) })}><option value={0}>Select lot</option>{lots.map((l) => <option key={l.id} value={l.id}>{l.lot_number} · {l.sku} · {num(l.qty_available)} free</option>)}</Select>}</Field>
+            <Field label="Change in quantity" error={adjTooLow ? `Only ${num(lot!.qty_available)} is free in this lot` : null}>{(id) => <Input id={id} type="number" step="0.1" value={adjForm.delta} onChange={(e) => setAdjForm({ ...adjForm, delta: Number(e.target.value) })} />}</Field>
+            <Field label="Reason (required)">{(id) => <Input id={id} value={adjForm.reason} onChange={(e) => setAdjForm({ ...adjForm, reason: e.target.value })} placeholder="e.g. Cycle count variance" />}</Field>
+          </div>
+        </div>
+      ) : confirmingDefect ? (
+        <div className="space-y-4">
+          <Notice tone="bad" className="font-medium">
+            Review before committing: this will immediately deduct <strong>{num(defForm.qty)}</strong> from available stock in lot <strong>{lot?.lot_number}</strong> and create an irreversible defect audit record.
+          </Notice>
+
+          <div className="rounded-lg border border-line bg-[#F8FAFB] p-4 text-[13.5px] space-y-2.5">
+            <div className="flex justify-between py-1 border-b border-line/60">
+              <span className="text-ink-3">Material SKU:</span>
+              <span className="font-semibold text-brand-teal">{lot?.sku}</span>
+            </div>
+            <div className="flex justify-between py-1 border-b border-line/60">
+              <span className="text-ink-3">Lot / Batch:</span>
+              <span className="font-mono font-semibold text-primary-navy">{lot?.lot_number}</span>
+            </div>
+            <div className="flex justify-between py-1 border-b border-line/60">
+              <span className="text-ink-3">Available Stock Before:</span>
+              <span className="font-medium">{num(lot?.qty_available)}</span>
+            </div>
+            <div className="flex justify-between py-1 border-b border-line/60">
+              <span className="text-ink-3">Defective Quantity to Write Off:</span>
+              <span className="font-bold text-bad">-{num(defForm.qty)}</span>
+            </div>
+            <div className="flex justify-between py-1 border-b border-line/60">
+              <span className="text-ink-3">Remaining Available Stock:</span>
+              <span className="font-bold text-ok">{num((lot?.qty_available ?? 0) - defForm.qty)}</span>
+            </div>
+            <div className="flex justify-between py-1 border-b border-line/60">
+              <span className="text-ink-3">Reserved Stock (Protected):</span>
+              <span className="font-medium text-[#3568B0]">{num(lot?.qty_reserved)}</span>
+            </div>
+            <div className="flex justify-between py-1 border-b border-line/60">
+              <span className="text-ink-3">Defect Reason:</span>
+              <span className="font-semibold text-primary-navy">{defForm.defect_reason === 'Other defect' ? defForm.custom_reason : defForm.defect_reason}</span>
+            </div>
+            {defForm.remarks.trim() && (
+              <div className="flex justify-between py-1 border-b border-line/60">
+                <span className="text-ink-3">Remarks / Reference:</span>
+                <span className="text-ink-2">{defForm.remarks}</span>
+              </div>
+            )}
+            <div className="flex justify-between py-1 pt-2 text-[12px] text-ink-3">
+              <span>Operational Timestamp:</span>
+              <span>{dateTime(nowStr)} (Operational IST)</span>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <Notice tone="warn">
+            <strong>Defective Stock Removal:</strong> Traceable write-off for damaged, contaminated, or failed quality material. This permanently decreases free stock and creates an audit movement log. Reserved stock is strictly protected.
+          </Notice>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Affected Lot / Batch" className="sm:col-span-2">
+              {(id) => (
+                <Select id={id} value={defForm.lot_id} onChange={(e) => setDefForm({ ...defForm, lot_id: Number(e.target.value) })}>
+                  <option value={0}>Select lot / batch</option>
+                  {lots.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.lot_number} · {l.sku} · {num(l.qty_available)} free ({num(l.qty_reserved)} reserved)
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+
+            {lot && (
+              <div className="sm:col-span-2 rounded-md border border-line bg-[#FAFBFD] p-3 text-[13px] grid grid-cols-3 gap-2">
+                <div>
+                  <span className="text-ink-3 block text-[11.5px]">Free Available</span>
+                  <span className="font-bold text-primary-navy text-[15px]">{num(lot.qty_available)}</span>
+                </div>
+                <div>
+                  <span className="text-ink-3 block text-[11.5px]">Reserved (Protected)</span>
+                  <span className="font-semibold text-[#3568B0] text-[15px]">{num(lot.qty_reserved)}</span>
+                </div>
+                <div>
+                  <span className="text-ink-3 block text-[11.5px]">Total Received</span>
+                  <span className="text-ink-2 text-[15px]">{num(lot.qty_received)}</span>
+                </div>
+              </div>
+            )}
+
+            <Field label="Defective Quantity to Remove"
+              error={defQtyTooHigh
+                ? `Cannot write off ${defForm.qty} — only ${num(lot!.qty_available)} is available in this lot. Reserved stock (${num(lot!.qty_reserved)}) cannot be written off.`
+                : defForm.qty < 0 ? 'Quantity must be positive' : null}
+              hint={lot ? `Max available: ${num(lot.qty_available)}` : undefined}>
+              {(id) => (
+                <Input id={id} type="number" min={0.1} step="0.1" value={defForm.qty || ''}
+                  onChange={(e) => setDefForm({ ...defForm, qty: Number(e.target.value) })}
+                  placeholder="e.g. 25.5" />
+              )}
+            </Field>
+
+            <Field label="Defect Reason">
+              {(id) => (
+                <Select id={id} value={defForm.defect_reason} onChange={(e) => setDefForm({ ...defForm, defect_reason: e.target.value })}>
+                  {DEFECT_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
+                </Select>
+              )}
+            </Field>
+
+            {defForm.defect_reason === 'Other defect' && (
+              <Field label="Specify Defect Reason" className="sm:col-span-2"
+                error={!defForm.custom_reason.trim() ? 'Please describe the defect reason' : null}>
+                {(id) => (
+                  <Input id={id} value={defForm.custom_reason}
+                    onChange={(e) => setDefForm({ ...defForm, custom_reason: e.target.value })}
+                    placeholder="Describe specific defect condition..." />
+                )}
+              </Field>
+            )}
+
+            <Field label="Remarks / Inspection Reference (Optional)" className="sm:col-span-2"
+              hint="e.g. Lab inspection reference, ticket number, or damage cause">
+              {(id) => (
+                <Input id={id} value={defForm.remarks}
+                  onChange={(e) => setDefForm({ ...defForm, remarks: e.target.value })}
+                  placeholder="e.g. INSP-2026-0042 / oil contamination during handling" />
+              )}
+            </Field>
+          </div>
+
+          <div className="rounded-md border border-line/60 bg-[#F4F6F8] px-3.5 py-2 text-[12px] text-ink-3 flex items-center justify-between">
+            <span>Operational Event: Real-time write-off recorded at current date & time</span>
+            <span className="font-medium text-ink-2">{dateTime(nowStr)}</span>
+          </div>
+        </div>
+      )}
     </Modal>
   )
 }

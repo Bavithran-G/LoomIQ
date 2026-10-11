@@ -132,13 +132,13 @@ function PlanModal({ onClose }: { onClose: () => void }) {
   })
   return (
     <Modal open onClose={onClose} title="Plan production job" wide
-      footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="primary" disabled={!f.order_id || !f.machine_id || f.planned_qty <= 0} loading={m.isPending} onClick={() => m.mutate()}>Plan job</Button></>}>
+      footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="primary" disabled={!f.order_id || !f.machine_id || f.planned_qty <= 0 || f.planned_date < isoDay()} loading={m.isPending} onClick={() => m.mutate()}>Plan job</Button></>}>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Order" className="sm:col-span-2">{(id) => <Select id={id} value={f.order_id} onChange={(e) => setF({ ...f, order_id: Number(e.target.value) })}><option value={0}>Select a confirmed order</option>
           {eligible.map((o) => <option key={o.id} value={o.id}>{o.order_no} · {o.buyer} · {o.fabric} · {num(o.metrics.remaining_to_weave_m)} m left to weave · due {date(o.promised_date)}</option>)}</Select>}</Field>
         <Field label="Stage">{(id) => <Select id={id} value={f.stage_code} onChange={(e) => setF({ ...f, stage_code: e.target.value, machine_id: 0 })}><option value="weaving">Weaving</option><option value="dyeing">Dyeing</option><option value="finishing">Finishing & packing</option></Select>}</Field>
         <Field label="Quantity (m)" hint={sel ? `Order ${num(sel.quantity)} m; ${num(sel.metrics.remaining_to_weave_m)} m still to weave` : undefined}>{(id) => <Input id={id} type="number" min={1} value={f.planned_qty} onChange={(e) => setF({ ...f, planned_qty: Number(e.target.value) })} />}</Field>
-        <Field label="Date">{(id) => <Input id={id} type="date" value={f.planned_date} onChange={(e) => setF({ ...f, planned_date: e.target.value })} />}</Field>
+        <Field label="Date" error={f.planned_date < isoDay() ? 'Planned date cannot be in the past' : null}>{(id) => <Input id={id} type="date" min={isoDay()} value={f.planned_date} onChange={(e) => setF({ ...f, planned_date: e.target.value })} />}</Field>
         <Field label="Shift">{(id) => <Select id={id} value={f.shift} onChange={(e) => setF({ ...f, shift: e.target.value })}><option value="A">A (06:00–14:00)</option><option value="B">B (14:00–22:00)</option><option value="C">C (22:00–06:00)</option></Select>}</Field>
         <Field label="Operator / team" className="sm:col-span-2">{(id) => <Input id={id} value={f.operator} onChange={(e) => setF({ ...f, operator: e.target.value })} placeholder="Optional" />}</Field>
       </div>
@@ -195,18 +195,23 @@ function CompleteModal({ job, onClose }: { job: Job; onClose: () => void }) {
 function DowntimeModal({ job, onClose }: { job: Job; onClose: () => void }) {
   const qc = useQueryClient()
   const toast = useToast()
-  const [f, setF] = useState({ minutes: 30, reason: '' })
+  const todayDate = isoDay()
+  const [f, setF] = useState({ minutes: 30, reason: '', occurred_on: todayDate })
   const m = useMutation({
     mutationFn: () => api('/api/production/downtime', { body: { machine_id: job.machine_id, job_id: job.id, ...f } }),
     onSuccess: () => { qc.invalidateQueries(); toast('ok', `Downtime recorded on ${job.machine}`); onClose() },
     onError: (e) => toast('bad', (e as Error).message),
   })
+  const isDateValid = f.occurred_on === todayDate
   return (
     <Modal open onClose={onClose} title={`Record downtime on ${job.machine}`}
-      footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="primary" disabled={f.minutes <= 0 || f.reason.trim().length < 3} loading={m.isPending} onClick={() => m.mutate()}>Record downtime</Button></>}>
-      <div className="grid gap-3 sm:grid-cols-[120px_1fr]">
+      footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="primary" disabled={f.minutes <= 0 || f.reason.trim().length < 3 || !isDateValid} loading={m.isPending} onClick={() => m.mutate()}>Record downtime</Button></>}>
+      <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Minutes">{(id) => <Input id={id} type="number" min={1} max={1440} value={f.minutes} onChange={(e) => setF({ ...f, minutes: Number(e.target.value) })} />}</Field>
-        <Field label="Reason">{(id) => <Select id={id} value={f.reason} onChange={(e) => setF({ ...f, reason: e.target.value })}>
+        <Field label="Event date" error={!isDateValid ? "Downtime must be recorded for today's operational date." : null} hint="Actual operational events cannot be past or future">
+          {(id) => <Input id={id} type="date" min={todayDate} max={todayDate} value={f.occurred_on} onChange={(e) => setF({ ...f, occurred_on: e.target.value })} />}
+        </Field>
+        <Field label="Reason" className="sm:col-span-2">{(id) => <Select id={id} value={f.reason} onChange={(e) => setF({ ...f, reason: e.target.value })}>
           <option value="">Select reason</option>{['Warp breakage', 'Weft insertion fault', 'Beam change', 'Power cut', 'Mechanical fault', 'Waiting for yarn', 'Operator unavailable'].map((r) => <option key={r}>{r}</option>)}</Select>}</Field>
       </div>
     </Modal>

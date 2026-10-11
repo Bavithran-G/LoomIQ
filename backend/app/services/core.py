@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timezone, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -8,6 +8,59 @@ from sqlalchemy.orm import Session
 from ..models import Event, ProductionStage, User
 
 EPS = 1e-6
+
+# --------------- timezone helpers ---------------
+_IST = timezone(timedelta(hours=5, minutes=30))
+
+
+def today_local() -> date:
+    """Current date in IST (India/Kolkata, UTC+5:30) — the application's operational timezone."""
+    return datetime.now(_IST).date()
+
+
+def today() -> date:
+    """Current operational business date."""
+    return today_local()
+
+
+# --------------- date-validation helpers ---------------
+def validate_event_date(d: date, field: str = "date") -> None:
+    """Raise BusinessError if *d* is in the future.
+
+    Operational events (receipt, adjustment, inspection, downtime) cannot happen
+    in the future.  Past dates are rejected too: we require today's date so the
+    system reflects actual real-time events.
+    """
+    t = today_local()
+    if d > t:
+        raise BusinessError(
+            f"{field.capitalize()} cannot be in the future "
+            f"(submitted {d.isoformat()}, today is {t.isoformat()}).",
+            422,
+        )
+    if d < t:
+        raise BusinessError(
+            f"{field.capitalize()} cannot be a past date "
+            f"(submitted {d.isoformat()}, today is {t.isoformat()}). "
+            "Record the event on the actual date it occurs.",
+            422,
+        )
+
+
+def validate_planned_date(d: date, field: str = "date") -> None:
+    """Raise BusinessError if *d* is strictly in the past.
+
+    Planned activities (jobs, dispatch, purchase orders) may be today or future.
+    """
+    t = today_local()
+    if d < t:
+        raise BusinessError(
+            f"{field.capitalize()} cannot be in the past "
+            f"(submitted {d.isoformat()}, today is {t.isoformat()}). "
+            "Planned activities must be scheduled for today or a future date.",
+            422,
+        )
+
 
 
 class BusinessError(Exception):
@@ -31,10 +84,6 @@ def r3(x: float) -> float:
 
 def money(x: float) -> float:
     return round(float(x) + 0.0, 2)
-
-
-def today() -> date:
-    return datetime.now(timezone.utc).date()
 
 
 def log_event(db: Session, entity_type: str, entity_id: int, event_type: str, message: str, *,
