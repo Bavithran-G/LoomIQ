@@ -78,7 +78,6 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 > ⚠️ `--reset` drops and recreates the configured database before inserting demo data. Do not use it against a database containing data you need to keep.
 
-With the frontend build available, open **http://localhost:8000**. Interactive API documentation is at **http://localhost:8000/docs**.
 
 ### Development mode
 
