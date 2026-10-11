@@ -3,7 +3,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useAuth } from './lib/auth'
 import { Shell } from './components/Shell'
 import { Empty, LoadingBlock } from './components/ui'
-// import Landing from './pages/Landing' // removed unused import
+import Landing from './pages/Landing'
 import Login from './pages/Login'
 import PublicRoll from './pages/PublicRoll'
 
@@ -39,10 +39,11 @@ export default function App() {
 
   if (!ready) return <LoadingBlock rows={6} />
 
-  // If user is not logged in:
+  // If user is not logged in — show public pages; redirect anything else to /login
   if (!user) {
     return (
       <Routes>
+        <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
