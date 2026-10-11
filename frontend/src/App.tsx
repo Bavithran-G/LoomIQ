@@ -3,7 +3,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useAuth } from './lib/auth'
 import { Shell } from './components/Shell'
 import { Empty, LoadingBlock } from './components/ui'
-import Landing from './pages/Landing'
+// import Landing from './pages/Landing' // removed unused import
 import Login from './pages/Login'
 import PublicRoll from './pages/PublicRoll'
 
@@ -43,9 +43,8 @@ export default function App() {
   if (!user) {
     return (
       <Routes>
-        <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     )
   }
