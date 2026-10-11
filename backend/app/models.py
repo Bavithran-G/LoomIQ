@@ -206,6 +206,7 @@ class FabricSpec(Base):
     labour_cost_per_m: Mapped[float] = mapped_column(Float, default=0)
     processing_cost_per_m: Mapped[float] = mapped_column(Float, default=0)
     rework_cost_per_m: Mapped[float] = mapped_column(Float, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     materials: Mapped[list["FabricSpecMaterial"]] = relationship(cascade="all, delete-orphan")
 
 

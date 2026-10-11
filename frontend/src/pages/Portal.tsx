@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { FileText, Plus } from 'lucide-react'
@@ -16,41 +16,33 @@ type FabricSpec = { id: number; code: string; name: string; construction: string
 function todayStr() { return new Date().toISOString().slice(0, 10) }
 function minDelivery() { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10) }
 
-function NewOrderModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (n: string) => void }) {
+function NewOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated: (n: string) => void }) {
   const toast = useToast()
   const { data: specs, isLoading: specsLoading } = useQuery({
     queryKey: ['portal-fabric-specs'],
     queryFn: () => api<FabricSpec[]>('/api/portal/fabric-specs'),
-    enabled: open,
   })
-  const [buyerPo, setBuyerPo] = useState('')
-  const [fabricId, setFabricId] = useState('')
-  const [colour, setColour] = useState('')
-  const [quantity, setQuantity] = useState('')
-  const [deliveryDate, setDeliveryDate] = useState('')
-  const [notes, setNotes] = useState('')
+  
+  const [f, setF] = useState({ buyerPo: '', fabricId: 0, colour: '', quantity: '', deliveryDate: '', notes: '' })
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [success, setSuccess] = useState<string | null>(null)
 
-  function reset() { setBuyerPo(''); setFabricId(''); setColour(''); setQuantity(''); setDeliveryDate(''); setNotes(''); setErr(null); setBusy(false); setSuccess(null) }
-  function handleClose() { reset(); onClose() }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault(); setErr(null)
-    if (!buyerPo.trim()) { setErr('Your PO reference is required.'); return }
-    if (!fabricId) { setErr('Please select a fabric.'); return }
-    if (!colour.trim()) { setErr('Colour / shade is required.'); return }
-    const qty = parseFloat(quantity)
-    if (!quantity || isNaN(qty) || qty <= 0) { setErr('Quantity must be a positive number.'); return }
+    if (!f.buyerPo.trim()) { setErr('Your PO reference is required.'); return }
+    if (!f.fabricId) { setErr('Please select a fabric.'); return }
+    if (!f.colour.trim()) { setErr('Colour / shade is required.'); return }
+    const qty = parseFloat(f.quantity)
+    if (!f.quantity || isNaN(qty) || qty <= 0) { setErr('Quantity must be a positive number.'); return }
     if (qty > 1_000_000) { setErr('Quantity exceeds maximum of 1,000,000 m.'); return }
-    if (!deliveryDate) { setErr('Requested delivery date is required.'); return }
-    if (deliveryDate <= todayStr()) { setErr('Delivery date must be in the future.'); return }
+    if (!f.deliveryDate) { setErr('Requested delivery date is required.'); return }
+    if (f.deliveryDate <= todayStr()) { setErr('Delivery date must be in the future.'); return }
     setBusy(true)
     try {
       const order = await api<BO>('/api/portal/orders', {
         method: 'POST',
-        body: { buyer_po: buyerPo.trim(), fabric_spec_id: parseInt(fabricId), colour: colour.trim(), quantity: qty, promised_date: deliveryDate, notes: notes.trim() },
+        body: { buyer_po: f.buyerPo.trim(), fabric_spec_id: f.fabricId, colour: f.colour.trim(), quantity: qty, promised_date: f.deliveryDate, notes: f.notes.trim() },
       })
       setSuccess(order.order_no)
       toast('ok', `Order ${order.order_no} submitted successfully.`)
@@ -59,10 +51,10 @@ function NewOrderModal({ open, onClose, onCreated }: { open: boolean; onClose: (
   }
 
   return (
-    <Modal open={open} onClose={handleClose} title="Create New Order" wide
+    <Modal open onClose={onClose} title="Create New Order" wide
       footer={success
-        ? <Button variant="primary" onClick={handleClose}>Close</Button>
-        : <><Button variant="ghost" onClick={handleClose} disabled={busy}>Cancel</Button><Button variant="primary" loading={busy} type="submit" form="new-order-form">Submit Order</Button></>
+        ? <Button variant="primary" onClick={onClose}>Close</Button>
+        : <><Button variant="ghost" onClick={onClose} disabled={busy}>Cancel</Button><Button variant="primary" loading={busy} type="submit" form="new-order-form">Submit Order</Button></>
       }
     >
       {success ? (
@@ -77,30 +69,30 @@ function NewOrderModal({ open, onClose, onCreated }: { open: boolean; onClose: (
           <Notice tone="info">Orders are created as <strong>Draft</strong> and reviewed by the mill before confirmation. Inventory is reserved only after the mill confirms your order.</Notice>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Your PO Reference" hint="Your internal purchase order number">
-              {(id) => <Input id={id} value={buyerPo} onChange={(e) => setBuyerPo(e.target.value)} placeholder="e.g. PO-2026-001" autoFocus />}
+              {(id) => <Input id={id} value={f.buyerPo} onChange={(e) => setF({ ...f, buyerPo: e.target.value })} placeholder="e.g. PO-2026-001" autoFocus />}
             </Field>
             <Field label="Fabric / Product">
               {(id) => specsLoading
                 ? <div className="h-10 animate-pulse rounded-md bg-sunk" />
-                : <Select id={id} value={fabricId} onChange={(e) => setFabricId(e.target.value)}>
-                    <option value="">Select fabric…</option>
+                : <Select id={id} value={f.fabricId} onChange={(e) => setF({ ...f, fabricId: Number(e.target.value) })}>
+                    <option value={0}>Select fabric…</option>
                     {specs?.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.code}){s.gsm ? ` · ${s.gsm} GSM` : ''}{s.width_cm ? ` · ${s.width_cm} cm` : ''}</option>)}
                   </Select>}
             </Field>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Colour / Shade">
-              {(id) => <Input id={id} value={colour} onChange={(e) => setColour(e.target.value)} placeholder="e.g. Navy Blue, Ecru, 100% White" />}
+              {(id) => <Input id={id} value={f.colour} onChange={(e) => setF({ ...f, colour: e.target.value })} placeholder="e.g. Navy Blue, Ecru, 100% White" />}
             </Field>
             <Field label="Quantity (metres)">
-              {(id) => <Input id={id} type="number" min="0.001" step="0.001" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="e.g. 5000" />}
+              {(id) => <Input id={id} type="number" min="0.001" step="0.001" value={f.quantity} onChange={(e) => setF({ ...f, quantity: e.target.value })} placeholder="e.g. 5000" />}
             </Field>
           </div>
           <Field label="Requested Delivery Date">
-            {(id) => <Input id={id} type="date" min={minDelivery()} value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} className="w-full sm:w-60" />}
+            {(id) => <Input id={id} type="date" min={minDelivery()} value={f.deliveryDate} onChange={(e) => setF({ ...f, deliveryDate: e.target.value })} className="w-full sm:w-60" />}
           </Field>
           <Field label="Notes / Special Requirements" hint="Finishing, packaging, certifications, or other requirements">
-            {(id) => <Textarea id={id} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional — any special requirements for this order" />}
+            {(id) => <Textarea id={id} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} placeholder="Optional — any special requirements for this order" />}
           </Field>
           {err && <Notice tone="bad">{err}</Notice>}
         </form>
@@ -127,7 +119,7 @@ function PortalList({ name }: { name: string }) {
         subtitle="Production stage, released quantity and shipments for your orders with Everest Textile Mills."
         actions={<Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setShowNew(true)}>Create New Order</Button>}
       />
-      <NewOrderModal open={showNew} onClose={() => setShowNew(false)} onCreated={handleCreated} />
+      {showNew && <NewOrderModal onClose={() => setShowNew(false)} onCreated={handleCreated} />}
       {isLoading && <LoadingBlock />}
       {error && <ErrorBox error={error} />}
       {data?.length === 0 && (

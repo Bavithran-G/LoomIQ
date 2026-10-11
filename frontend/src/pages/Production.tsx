@@ -36,51 +36,63 @@ export default function Production() {
     return { planned: w.reduce((s, j) => s + j.planned_qty, 0), actual: w.filter((j) => j.status === 'completed').reduce((s, j) => s + j.actual_qty, 0) }
   }, [jobs.data])
 
+  const colConfig: Record<typeof COLS[number], { label: string; accent: string; countClass: string }> = {
+    planned: { label: 'Planned', accent: 'bg-indigo-mist/30', countClass: 'bg-primary-navy/10 text-primary-navy' },
+    running: { label: 'Running', accent: 'bg-ok-soft', countClass: 'bg-ok/15 text-ok' },
+    paused: { label: 'Paused', accent: 'bg-warn-soft/50', countClass: 'bg-warn/15 text-warn' },
+    completed: { label: 'Completed', accent: 'bg-sunk', countClass: 'bg-line text-ink-3' },
+  }
   return (
     <div>
       <PageHeader title="Production planning" subtitle="Jobs on looms, dyeing and finishing by shift. Capacity is checked when a job is planned."
         actions={manage && <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setPlan(true)}>Plan job</Button>} />
-      <div className="mb-3 flex flex-wrap items-end gap-2">
+      <div className="mb-4 flex flex-wrap items-end gap-2">
         <Field label="From">{(id) => <Input id={id} type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="w-40" />}</Field>
         <Field label="To">{(id) => <Input id={id} type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-40" />}</Field>
         <Field label="Stage">{(id) => <Select id={id} value={stage} onChange={(e) => setStage(e.target.value)} className="w-36"><option value="">All stages</option><option value="weaving">Weaving</option><option value="dyeing">Dyeing</option><option value="finishing">Finishing</option></Select>}</Field>
         <Field label="Shift">{(id) => <Select id={id} value={shift} onChange={(e) => setShift(e.target.value)} className="w-28"><option value="">All</option><option>A</option><option>B</option><option>C</option></Select>}</Field>
-        <div className="ml-auto rounded-md border border-line bg-surface px-3 py-1.5 text-[13px]">
-          Weaving in range: <b>{metres(totals.actual)}</b> done of <b>{metres(totals.planned)}</b> planned
+        <div className="ml-auto rounded-lg border border-line bg-surface px-3.5 py-2 text-[13px] shadow-xs">
+          Weaving in range: <b className="text-primary-navy">{metres(totals.actual)}</b> done of <b className="text-ink">{metres(totals.planned)}</b> planned
         </div>
       </div>
       {jobs.isLoading && <LoadingBlock />}
       {jobs.error && <ErrorBox error={jobs.error} />}
       {jobs.data && (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {COLS.map((c) => (
-            <section key={c} className="flex min-h-40 flex-col rounded-lg border border-line bg-sunk/60">
-              <header className="flex items-center justify-between px-3 py-2">
-                <h2 className="text-[16px] font-semibold">{human(c)}</h2>
-                <span className="text-[13px] text-ink-3">{by[c].length}</span>
+          {COLS.map((c) => {
+            const cfg = colConfig[c]
+            return (
+            <section key={c} className="flex min-h-40 flex-col rounded-xl border border-line bg-sunk/40">
+              <header className={clsx('flex items-center justify-between rounded-t-xl px-3.5 py-2.5 border-b border-line', cfg.accent)}>
+                <h2 className="text-[13.5px] font-bold uppercase tracking-wide text-ink-2">{cfg.label}</h2>
+                <span className={clsx('rounded-full px-2 py-0.5 text-[11px] font-bold', cfg.countClass)}>{by[c].length}</span>
               </header>
-              <div className="flex flex-col gap-2 px-2 pb-2">
-                {by[c].length === 0 && <p className="px-1 py-4 text-center text-[13px] text-ink-3">No {c} jobs</p>}
+              <div className="flex flex-col gap-2 p-2">
+                {by[c].length === 0 && <p className="px-1 py-6 text-center text-[13px] text-ink-3">No {c} jobs</p>}
                 {by[c].map((j) => (
-                  <article key={j.id} className={clsx('rounded-md border bg-surface p-2.5 text-[13px]', j.priority === 'urgent' || j.priority === 'high' ? 'border-l-[3px] border-line border-l-bad' : 'border-line')}>
+                  <article key={j.id} className={clsx(
+                    'rounded-lg border bg-surface p-3 text-[13px] shadow-xs transition-shadow hover:shadow-sm',
+                    j.priority === 'urgent' ? 'border-l-[3px] border-line border-l-bad' :
+                    j.priority === 'high' ? 'border-l-[3px] border-line border-l-warn' : 'border-line'
+                  )}>
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <div className="font-semibold text-ink">{j.job_no}</div>
-                        <Link to={`/orders/${j.order_id}`} className="text-indigo-thread hover:underline">{j.order_no}</Link> <span className="text-ink-3">· {j.buyer}</span>
+                        <div className="font-bold text-primary-navy text-[13.5px]">{j.job_no}</div>
+                        <Link to={`/orders/${j.order_id}`} className="text-brand-teal hover:underline font-medium">{j.order_no}</Link> <span className="text-ink-3">· {j.buyer}</span>
                       </div>
-                      <span className="rounded bg-sunk px-1.5 py-0.5 text-[12px] font-medium text-ink-2">{human(j.stage_code)}</span>
+                      <span className="rounded-md bg-sunk border border-line px-1.5 py-0.5 text-[11px] font-semibold text-ink-2 whitespace-nowrap">{human(j.stage_code)}</span>
                     </div>
-                    <div className="mt-1.5 grid grid-cols-2 gap-x-2 text-ink-2">
+                    <div className="mt-2 grid grid-cols-2 gap-x-2 gap-y-0.5 text-[12.5px] text-ink-2">
                       <span>{j.machine ?? 'No machine'} · shift {j.shift}</span><span className="text-right">{date(j.planned_date)}</span>
-                      <span>{j.status === 'completed' ? `${num(j.actual_qty)} of ${num(j.planned_qty)} m` : `${num(j.planned_qty)} m planned`}</span>
+                      <span className="font-medium">{j.status === 'completed' ? `${num(j.actual_qty)} of ${num(j.planned_qty)} m` : `${num(j.planned_qty)} m planned`}</span>
                       <span className="text-right">due {date(j.promised_date)}</span>
                     </div>
                     {j.status === 'completed' && j.planned_qty > 0 && (
-                      <div className="mt-1.5 h-1.5 overflow-hidden rounded-sm bg-sunk"><div className={clsx('h-full', j.actual_qty < j.planned_qty ? 'twill twill-warn' : 'twill')} style={{ width: `${Math.min(100, (j.actual_qty / j.planned_qty) * 100)}%` }} /></div>
+                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-sunk"><div className={clsx('h-full rounded-full', j.actual_qty < j.planned_qty ? 'twill twill-warn' : 'twill twill-teal')} style={{ width: `${Math.min(100, (j.actual_qty / j.planned_qty) * 100)}%` }} /></div>
                     )}
-                    {j.delay_reason && <p className="mt-1.5 text-[12.5px] text-warn">{j.delay_reason}</p>}
+                    {j.delay_reason && <p className="mt-1.5 text-[12px] text-warn font-medium">{j.delay_reason}</p>}
                     {manage && j.status !== 'completed' && (
-                      <div className="mt-2 flex flex-wrap gap-1.5">
+                      <div className="mt-2.5 flex flex-wrap gap-1.5">
                         {j.status === 'planned' && <Button size="sm" variant="ok" icon={<Play className="size-3.5" />} onClick={() => act.mutate({ id: j.id, action: 'start' })}>Start</Button>}
                         {j.status === 'running' && <Button size="sm" icon={<Pause className="size-3.5" />} onClick={() => act.mutate({ id: j.id, action: 'pause', reason: 'Paused by supervisor' })}>Pause</Button>}
                         {j.status === 'paused' && <Button size="sm" variant="ok" icon={<Play className="size-3.5" />} onClick={() => act.mutate({ id: j.id, action: 'resume' })}>Resume</Button>}
@@ -93,7 +105,8 @@ export default function Production() {
                 ))}
               </div>
             </section>
-          ))}
+          )})
+        }
         </div>
       )}
       {plan && <PlanModal onClose={() => setPlan(false)} />}

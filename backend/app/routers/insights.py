@@ -4,16 +4,17 @@ from datetime import date, timedelta
 from fastapi import APIRouter, Depends
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import (Buyer, Dispatch, DispatchStatus, Event, FabricSpec, Inspection, Machine, OrderStatus,
-                      ProductionStage, Role, Roll, RollQuality, SalesOrder, User)
+from ..models import (Buyer, Dispatch, DispatchStatus, Event, FabricSpec, FabricSpecMaterial, Inspection,
+                      Machine, Material, OrderStatus, ProductionStage, Role, Roll, RollQuality,
+                      SalesOrder, StockMovement, User)
 from ..security import create_token, current_user, hash_password, permissions_for, require, verify_password
 from ..serializers import dispatch_out, order_buyer_out, user_out
 from ..services import costing, dashboard, risk, simulator
-from ..services.core import BusinessError, NotFound, money, next_number, today
+from ..services.core import BusinessError, NotFound, log_event, money, next_number, today
 from ..services.orders import create_order as svc_create_order, order_metrics
 
 router = APIRouter(prefix="/api", tags=["insights"])
@@ -282,7 +283,7 @@ def portal_fabric_specs(db: Session = Depends(get_db), _: User = Depends(require
     """Fabric specs available for buyers to choose when creating an order."""
     return [{"id": s.id, "code": s.code, "name": s.name,
              "construction": s.construction, "gsm": s.gsm, "width_cm": s.width_cm}
-            for s in db.scalars(select(FabricSpec).order_by(FabricSpec.code))]
+            for s in db.scalars(select(FabricSpec).where(FabricSpec.is_active.is_(True)).order_by(FabricSpec.code))]
 
 
 @router.post("/portal/orders", status_code=201)
@@ -368,6 +369,56 @@ def patch_user(uid: int, body: UserPatch, db: Session = Depends(get_db), me_: Us
     return user_out(u)
 
 
+@router.delete("/admin/users/{uid}")
+def delete_user(uid: int, db: Session = Depends(get_db), me_: User = Depends(require("admin.manage"))):
+    """Safely remove a user: permanently if no audit/business dependencies exist, or deactivate/archive if referenced."""
+    if uid == me_.id:
+        raise BusinessError("You cannot remove your own account", 400)
+    u = db.get(User, uid)
+    if not u:
+        raise NotFound("User")
+    if u.role == Role.admin and u.is_active:
+        active_admins = db.scalar(
+            select(func.count(User.id)).where(User.role == Role.admin, User.is_active.is_(True), User.id != u.id)
+        )
+        if not active_admins or active_admins <= 0:
+            raise BusinessError("Cannot remove the last active administrator", 400)
+
+    # Check for historical references across the system
+    has_events = db.scalar(select(func.count(Event.id)).where(Event.user_id == u.id)) or 0
+    has_movements = db.scalar(select(func.count(StockMovement.id)).where(StockMovement.user_id == u.id)) or 0
+    has_inspections = db.scalar(select(func.count(Inspection.id)).where(
+        (Inspection.created_by_id == u.id) | (Inspection.reviewer_id == u.id)
+    )) or 0
+    has_dispatches = db.scalar(select(func.count(Dispatch.id)).where(Dispatch.created_by_id == u.id)) or 0
+    has_orders = 0
+    if u.buyer_id:
+        has_orders = db.scalar(select(func.count(SalesOrder.id)).where(SalesOrder.buyer_id == u.buyer_id)) or 0
+
+    has_history = (has_events + has_movements + has_inspections + has_dispatches + has_orders) > 0
+
+    if has_history:
+        u.is_active = False
+        log_event(db, "user", u.id, "archived",
+                  f"User {u.username} archived due to historical activity ({has_events} logs, {has_inspections} inspections, {has_movements} movements)",
+                  user=me_)
+        db.commit()
+        return {
+            "id": u.id,
+            "action": "archived",
+            "message": f"User '{u.username}' has historical business records and was safely archived and disabled to preserve audit integrity."
+        }
+    else:
+        username = u.username
+        db.delete(u)
+        db.commit()
+        return {
+            "id": uid,
+            "action": "deleted",
+            "message": f"User '{username}' had no historical records and was permanently removed."
+        }
+
+
 @router.get("/admin/roles")
 def roles(_: User = Depends(require("admin.manage"))):
     return [{"role": r.value, "permissions": permissions_for(r)} for r in Role]
@@ -388,11 +439,120 @@ def patch_stage(sid: int, body: StageIn, db: Session = Depends(get_db), user: Us
     return {"id": s.id, "code": s.code, "active": s.active}
 
 
+# ---- fabric specs management ----
+
+class FabricSpecMaterialIn(BaseModel):
+    material_id: int
+    qty_per_m: float = Field(gt=0)
+
+
+class FabricSpecIn(BaseModel):
+    code: str = Field(min_length=1, max_length=30)
+    name: str = Field(min_length=1, max_length=120)
+    construction: str = Field(default="", max_length=120)
+    gsm: float = Field(ge=0, default=0)
+    width_cm: float = Field(ge=0, default=0)
+    labour_cost_per_m: float = Field(ge=0, default=0)
+    processing_cost_per_m: float = Field(ge=0, default=0)
+    rework_cost_per_m: float = Field(ge=0, default=0)
+    materials: list[FabricSpecMaterialIn] = []
+
+
+class FabricSpecPatch(BaseModel):
+    is_active: bool | None = None
+
+
 @router.get("/admin/fabric-specs")
 def specs(db: Session = Depends(get_db), _: User = Depends(require("cost.view"))):
     return [{"id": s.id, "code": s.code, "name": s.name, "construction": s.construction, "gsm": s.gsm,
              "width_cm": s.width_cm, "labour_cost_per_m": s.labour_cost_per_m,
              "processing_cost_per_m": s.processing_cost_per_m, "rework_cost_per_m": s.rework_cost_per_m,
-             "materials": [{"sku": l.material.sku, "qty_per_m": l.qty_per_m, "standard_cost": l.material.standard_cost}
+             "is_active": s.is_active,
+             "materials": [{"material_id": l.material_id, "sku": l.material.sku, "name": l.material.name,
+                            "qty_per_m": l.qty_per_m, "standard_cost": l.material.standard_cost, "uom": l.material.uom}
                            for l in s.materials]}
             for s in db.scalars(select(FabricSpec).order_by(FabricSpec.code))]
+
+
+@router.post("/admin/fabric-specs", status_code=201)
+def create_fabric_spec(body: FabricSpecIn, db: Session = Depends(get_db), _: User = Depends(require("admin.manage"))):
+    code = body.code.strip().upper()
+    name = body.name.strip()
+    if not code:
+        raise BusinessError("Specification code is required", 422)
+    if not name:
+        raise BusinessError("Fabric name is required", 422)
+
+    existing = db.scalar(select(FabricSpec).where(FabricSpec.code == code))
+    if existing:
+        if not existing.is_active:
+            raise BusinessError(f"A fabric specification with code '{code}' exists in archived state. Please restore or use a different code.", 409)
+        raise BusinessError(f"Fabric specification '{code}' already exists", 409)
+
+    spec = FabricSpec(
+        code=code,
+        name=name,
+        construction=body.construction.strip(),
+        gsm=body.gsm,
+        width_cm=body.width_cm,
+        labour_cost_per_m=body.labour_cost_per_m,
+        processing_cost_per_m=body.processing_cost_per_m,
+        rework_cost_per_m=body.rework_cost_per_m,
+        is_active=True,
+    )
+    for m in body.materials:
+        mat = db.get(Material, m.material_id)
+        if not mat:
+            raise NotFound(f"Material {m.material_id}")
+        spec.materials.append(FabricSpecMaterial(material_id=m.material_id, qty_per_m=m.qty_per_m))
+
+    db.add(spec)
+    db.commit()
+    db.refresh(spec)
+    return {
+        "id": spec.id, "code": spec.code, "name": spec.name, "construction": spec.construction,
+        "gsm": spec.gsm, "width_cm": spec.width_cm, "labour_cost_per_m": spec.labour_cost_per_m,
+        "processing_cost_per_m": spec.processing_cost_per_m, "rework_cost_per_m": spec.rework_cost_per_m,
+        "is_active": spec.is_active,
+        "materials": [{"material_id": l.material_id, "sku": l.material.sku, "name": l.material.name,
+                       "qty_per_m": l.qty_per_m, "standard_cost": l.material.standard_cost, "uom": l.material.uom}
+                      for l in spec.materials]
+    }
+
+
+@router.delete("/admin/fabric-specs/{sid}")
+def delete_fabric_spec(sid: int, db: Session = Depends(get_db), _: User = Depends(require("admin.manage"))):
+    spec = db.get(FabricSpec, sid)
+    if not spec:
+        raise NotFound("Fabric spec")
+
+    order_count = db.scalar(select(func.count(SalesOrder.id)).where(SalesOrder.fabric_spec_id == spec.id)) or 0
+    if order_count > 0:
+        spec.is_active = False
+        db.commit()
+        return {
+            "id": spec.id,
+            "action": "archived",
+            "message": f"Fabric specification '{spec.code}' is referenced by {order_count} order(s) and was safely archived. It is hidden from new order selection while preserving all historical records and costing."
+        }
+    else:
+        code = spec.code
+        name = spec.name
+        db.delete(spec)
+        db.commit()
+        return {
+            "id": sid,
+            "action": "deleted",
+            "message": f"Fabric specification '{code}' ({name}) had no order references and was permanently deleted."
+        }
+
+
+@router.patch("/admin/fabric-specs/{sid}")
+def patch_fabric_spec(sid: int, body: FabricSpecPatch, db: Session = Depends(get_db), _: User = Depends(require("admin.manage"))):
+    spec = db.get(FabricSpec, sid)
+    if not spec:
+        raise NotFound("Fabric spec")
+    if body.is_active is not None:
+        spec.is_active = body.is_active
+    db.commit()
+    return {"id": spec.id, "code": spec.code, "is_active": spec.is_active}

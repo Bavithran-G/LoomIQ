@@ -5,10 +5,10 @@ import { STAGE_NAMES, metres } from '../lib/format'
 export function Mark({ className = 'size-8', inverted }: { className?: string; inverted?: boolean }) {
   return (
     <svg viewBox="0 0 32 32" className={className} aria-hidden>
-      <rect width="32" height="32" rx="7" fill={inverted ? '#ffffff' : '#13294B'} />
-      <g fill="none" strokeWidth="3.2" strokeLinecap="round">
-        <path d="M10 7v18M16 7v18M22 7v18" stroke={inverted ? '#13294B' : '#8FA6CC'} />
-        <path d="M7 11h6m6 0h6M7 16h3m4 0h4m4 0h3M7 21h6m6 0h6" stroke="#2BB3A3" />
+      <rect width="32" height="32" rx="7" fill={inverted ? '#FFFFFF' : '#0D1B2A'} />
+      <g fill="none" strokeWidth="3" strokeLinecap="round">
+        <path d="M10 7v18M16 7v18M22 7v18" stroke={inverted ? '#142B46' : '#8FA6CC'} />
+        <path d="M7 11h6m6 0h6M7 16h3m4 0h4m4 0h3M7 21h6m6 0h6" stroke="#138A78" />
       </g>
     </svg>
   )
@@ -16,10 +16,10 @@ export function Mark({ className = 'size-8', inverted }: { className?: string; i
 
 export function Wordmark({ light, className }: { light?: boolean; className?: string }) {
   return (
-    <span className={clsx('inline-flex items-center gap-2', className)}>
+    <span className={clsx('inline-flex items-center gap-2.5', className)}>
       <Mark className="size-8 shrink-0" />
-      <span className={clsx('font-display text-[22px] leading-none font-bold tracking-tight', light ? 'text-white' : 'text-indigo-loom')}>
-        Loom<span className={light ? 'text-[#8FA6CC]' : 'text-indigo-thread'}>IQ</span>
+      <span className={clsx('font-display text-[21px] leading-none font-bold tracking-tight', light ? 'text-white' : 'text-primary-navy')}>
+        Loom<span className={light ? 'text-[#138A78]' : 'text-brand-teal'}>IQ</span>
       </span>
     </span>
   )

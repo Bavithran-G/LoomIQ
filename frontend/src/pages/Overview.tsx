@@ -169,12 +169,13 @@ function KpiStrip({ d, nav }: { d: Dash; nav: (to: string) => void }) {
     { label: 'Est. cost, open orders', value: money(k.estimated_cost_open_orders), sub: 'standard-cost estimate', to: '/cost' },
   ]
   return (
-    <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-3 2xl:grid-cols-9" style={{ gap: 1 }}>
+    <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-3 2xl:grid-cols-9" style={{ gap: 1 }}>
       {items.map((it) => (
-        <button key={it.label} onClick={() => nav(it.to)} className="group flex flex-col items-start bg-surface px-3.5 py-3 text-left hover:bg-sunk">
-          <span className="flex w-full items-center justify-between text-[12.5px] text-ink-3">{it.label}<ArrowUpRight className="size-3.5 opacity-0 group-hover:opacity-100" /></span>
-          <span className={clsx('font-display text-[22px] leading-tight font-semibold', it.tone === 'bad' ? 'text-bad' : it.tone === 'warn' ? 'text-warn' : 'text-indigo-loom')}>{it.value}</span>
-          <span className="text-[12px] text-ink-3">{it.sub}</span>
+        <button key={it.label} onClick={() => nav(it.to)} className="group relative flex flex-col items-start bg-surface px-3.5 py-3.5 text-left hover:bg-sunk transition-colors">
+          <span className={clsx('absolute inset-x-0 top-0 h-[2.5px] rounded-t-sm opacity-0 group-hover:opacity-100 transition-opacity duration-150', it.tone === 'bad' ? 'bg-bad' : it.tone === 'warn' ? 'bg-warn' : 'bg-brand-teal')} />
+          <span className="flex w-full items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-ink-3">{it.label}<ArrowUpRight className="size-3 opacity-0 group-hover:opacity-60 transition-opacity" /></span>
+          <span className={clsx('font-display text-[21px] leading-tight font-bold mt-0.5', it.tone === 'bad' ? 'text-bad' : it.tone === 'warn' ? 'text-warn' : 'text-primary-navy')}>{it.value}</span>
+          <span className="text-[11.5px] text-ink-3 mt-0.5 leading-tight">{it.sub}</span>
         </button>
       ))}
     </div>
@@ -184,16 +185,17 @@ function KpiStrip({ d, nav }: { d: Dash; nav: (to: string) => void }) {
 function StagePipe({ stages }: { stages: { stage: string; metres: number }[] }) {
   const map = Object.fromEntries(stages.map((s) => [s.stage, s.metres]))
   const max = Math.max(1, ...stages.map((s) => s.metres))
+  const colors = ['#138A78', '#116B5C', '#142B46', '#1D3A5E', '#0D1B2A']
   return (
-    <ol className="grid gap-3 sm:grid-cols-5">
+    <ol className="grid gap-4 sm:grid-cols-5">
       {STAGE_ORDER.map((s, i) => (
         <li key={s} className="relative">
-          <div className="flex items-baseline justify-between text-[13px]">
+          <div className="flex items-baseline justify-between text-[13px] mb-1.5">
             <span className="font-medium text-ink-2">{i + 1}. {STAGE_NAMES[s]}</span>
-            <span className="font-display text-[17px] font-semibold text-indigo-loom">{int(map[s] ?? 0)} m</span>
+            <span className="font-display text-[18px] font-bold" style={{ color: colors[i] }}>{int(map[s] ?? 0)} m</span>
           </div>
-          <div className="mt-1 h-3 overflow-hidden rounded-sm bg-sunk">
-            <div className="twill twill-indigo h-full" style={{ width: `${((map[s] ?? 0) / max) * 100}%` }} />
+          <div className="h-2.5 overflow-hidden rounded-full bg-sunk">
+            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${((map[s] ?? 0) / max) * 100}%`, backgroundColor: colors[i] }} />
           </div>
         </li>
       ))}
@@ -221,25 +223,26 @@ function RoleWelcome({ user, nav }: WelcomeProps) {
   const navMap = Object.fromEntries(NAV.map((n) => [n.label, n]))
 
   return (
-    <div className="relative rounded-xl border border-indigo-loom/20 bg-gradient-to-r from-indigo-loom/5 to-transparent p-4">
+    <div className="relative overflow-hidden rounded-xl border border-brand-teal/20 bg-gradient-to-r from-primary-navy/[0.04] via-brand-teal/[0.03] to-transparent p-4">
+      <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-brand-teal to-primary-navy rounded-l-xl" />
       <button onClick={dismiss} className="absolute top-3 right-3 rounded p-1 text-ink-3 hover:bg-sunk" aria-label="Dismiss">
         <X className="size-4" />
       </button>
-      <div className="flex items-center gap-2 mb-3">
-        <Layers className="size-5 text-indigo-loom shrink-0" />
+      <div className="flex items-center gap-2.5 mb-3 pl-3">
+        <Layers className="size-5 text-brand-teal shrink-0" />
         <div>
-          <p className="text-[15px] font-semibold text-indigo-loom">Welcome back, {firstName}!</p>
-          <p className="text-[12.5px] text-ink-3">Signed in as <span className="font-medium text-ink">{roleName}</span> · Your modules are highlighted below</p>
+          <p className="text-[15.5px] font-bold text-primary-navy">Welcome back, {firstName}</p>
+          <p className="text-[12.5px] text-ink-3">Signed in as <span className="font-semibold text-ink">{roleName}</span> · Your modules are highlighted below</p>
         </div>
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 pl-3">
         {myModules.map((label) => {
           const n = navMap[label]
           if (!n) return null
           const Icon = n.icon
           return (
             <button key={label} onClick={() => { nav(n.to); dismiss() }}
-              className="flex items-center gap-1.5 rounded-lg border border-indigo-loom/20 bg-white px-3 py-1.5 text-[13px] font-medium text-indigo-loom shadow-sm hover:bg-indigo-loom hover:text-white transition-colors">
+              className="flex items-center gap-1.5 rounded-lg border border-brand-teal/25 bg-white px-3 py-1.5 text-[12.5px] font-semibold text-brand-teal shadow-xs hover:bg-brand-teal hover:border-brand-teal hover:text-white transition-all duration-150">
               <Icon className="size-3.5" />
               {label}
             </button>

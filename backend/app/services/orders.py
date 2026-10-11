@@ -112,8 +112,11 @@ def create_order(db: Session, data: dict, user: User) -> SalesOrder:
     _validate(data["quantity"], data["order_date"], data["promised_date"])
     if not db.get(Buyer, data["buyer_id"]):
         raise NotFound("Buyer")
-    if not db.get(FabricSpec, data["fabric_spec_id"]):
+    spec = db.get(FabricSpec, data["fabric_spec_id"])
+    if not spec:
         raise NotFound("Fabric spec")
+    if not spec.is_active:
+        raise BusinessError(f"Fabric specification '{spec.code}' is archived and cannot be used for new orders", 422)
     po = data["buyer_po"].strip()
     if not po:
         raise BusinessError("Buyer PO reference is required", 422)

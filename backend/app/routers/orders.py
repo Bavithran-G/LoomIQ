@@ -55,7 +55,7 @@ def _order(db: Session, oid: int) -> SalesOrder:
 
 @router.get("/reference")
 def reference(db: Session = Depends(get_db), _: User = Depends(require("orders.view"))):
-    specs = db.scalars(select(FabricSpec).order_by(FabricSpec.code)).all()
+    specs = db.scalars(select(FabricSpec).where(FabricSpec.is_active.is_(True)).order_by(FabricSpec.code)).all()
     return {
         "buyers": [{"id": b.id, "code": b.code, "name": b.name, "city": b.city}
                    for b in db.scalars(select(Buyer).order_by(Buyer.name))],
