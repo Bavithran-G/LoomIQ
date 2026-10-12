@@ -4,12 +4,6 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-<<<<<<< HEAD
-DATABASE_URL = os.getenv(
-    "LOOMIQ_DATABASE_URL",
-    f"sqlite:///{BASE_DIR / 'loomiq.db'}",
-)
-=======
 try:
     from dotenv import load_dotenv
     load_dotenv(BASE_DIR / ".env")
@@ -19,7 +13,6 @@ except ImportError:
 
 _default_db = f"sqlite:///{(BASE_DIR / 'loomiq.db').as_posix()}"
 DATABASE_URL = os.getenv("LOOMIQ_DATABASE_URL", _default_db)
->>>>>>> 2ef87c84d3f20948c75cbcbce1162469a0cae3dc
 # Secret for signing JWTs. MUST be overridden in any shared deployment.
 SECRET_KEY = os.getenv("LOOMIQ_SECRET_KEY", "dev-only-change-me-loomiq-secret")
 ACCESS_TOKEN_MINUTES = int(os.getenv("LOOMIQ_TOKEN_MINUTES", "720"))

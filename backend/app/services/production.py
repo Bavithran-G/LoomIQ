@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import math
 import secrets
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -16,7 +16,7 @@ from ..models import (CostEntry, Downtime, JobStatus, Machine, MachineState, Ord
                       ProductionStage, Roll, RollEvent, RollQuality, RollStage, SalesOrder, User)
 from . import inventory, orders as order_svc
 from .core import (EPS, STAGE_COST_SHARE, STAGE_LOCATION, BusinessError, NotFound, log_event,
-                   next_number, next_stage_code, r3)
+                   next_number, next_stage_code, r3, validate_planned_date)
 
 SHIFTS = ("A", "B", "C")
 OPEN_JOB = (JobStatus.planned, JobStatus.running, JobStatus.paused)
@@ -39,24 +39,94 @@ def machine_runtime_status(db: Session, m: Machine) -> str:
     return "running" if running else "idle"
 
 
+def get_available_material_m(db: Session, order_id: int, stage_code: str) -> float:
+    """Returns total metres of material waiting at this stage for this order."""
+    if stage_code == "weaving":
+        return 0.0
+    elif stage_code == "dyeing":
+        return float(db.scalar(
+            select(func.coalesce(func.sum(Roll.length_m), 0.0)).where(
+                Roll.order_id == order_id,
+                Roll.stage == RollStage.dyeing,
+                Roll.quality.in_([RollQuality.pending, RollQuality.accepted]),
+            )
+        ) or 0.0)
+    elif stage_code == "finishing":
+        return float(db.scalar(
+            select(func.coalesce(func.sum(Roll.length_m), 0.0)).where(
+                Roll.order_id == order_id,
+                Roll.stage == RollStage.finishing,
+                Roll.quality == RollQuality.accepted,
+            )
+        ) or 0.0)
+    return 0.0
+
+
 def create_job(db: Session, data: dict, user: User) -> ProductionJob:
-    order = db.get(SalesOrder, data["order_id"])
+    # 1. Planned date validation (cannot be in past)
+    validate_planned_date(data["planned_date"], "Planned date")
+
+    # 2. Lock order to serialize concurrent job creations
+    order = db.get(SalesOrder, data["order_id"], with_for_update=True)
     if not order:
         raise NotFound("Order")
     if order.status not in (OrderStatus.confirmed, OrderStatus.in_production):
         raise BusinessError(f"Jobs can only be planned for confirmed or in-production orders "
                             f"({order.order_no} is {order.status.value})")
+
     stage = db.scalar(select(ProductionStage).where(ProductionStage.code == data["stage_code"]))
     if not stage or not stage.active or not stage.job_based:
         raise BusinessError(f"Stage '{data['stage_code']}' is not an active machine stage", 422)
     if data["shift"] not in SHIFTS:
         raise BusinessError("Shift must be A, B or C", 422)
+
     qty = float(data["planned_qty"])
     if qty <= 0:
         raise BusinessError("Planned quantity must be greater than zero", 422)
-    if qty > order.quantity * 1.1 + EPS:
-        raise BusinessError(f"Planned quantity {qty:g} m exceeds the order quantity ({order.quantity:g} m) "
-                            f"plus 10% allowance", 422)
+
+    # 3. Prevent duplicate processing / overlapping schedule on multiple looms or machines
+    conflicting = db.scalar(
+        select(ProductionJob).where(
+            ProductionJob.order_id == order.id,
+            ProductionJob.stage_code == stage.code,
+            ProductionJob.planned_date == data["planned_date"],
+            ProductionJob.shift == data["shift"],
+            ProductionJob.status.in_(OPEN_JOB),
+        ).with_for_update()
+    )
+    if conflicting:
+        conflicting_mach = conflicting.machine.code if conflicting.machine else "another machine"
+        raise BusinessError(
+            f"This order already has a {stage.name.lower()} job ({conflicting.job_no}) scheduled on "
+            f"{conflicting_mach} for Shift {conflicting.shift}. Complete or cancel the existing job "
+            f"before scheduling the same quantity on another loom."
+        )
+
+    # 4. Total scheduled quantity must not exceed remaining order quantity for this stage
+    completed_qty = float(db.scalar(
+        select(func.coalesce(func.sum(ProductionJob.actual_qty), 0.0)).where(
+            ProductionJob.order_id == order.id,
+            ProductionJob.stage_code == stage.code,
+            ProductionJob.status == JobStatus.completed,
+        )
+    ) or 0.0)
+    open_qty = float(db.scalar(
+        select(func.coalesce(func.sum(ProductionJob.planned_qty), 0.0)).where(
+            ProductionJob.order_id == order.id,
+            ProductionJob.stage_code == stage.code,
+            ProductionJob.status.in_(OPEN_JOB),
+        )
+    ) or 0.0)
+    max_allowed = order.quantity * 1.1
+    remaining_schedulable = max(0.0, max_allowed - completed_qty - open_qty)
+    if qty > remaining_schedulable + EPS:
+        raise BusinessError(
+            f"Planned quantity {qty:g} m exceeds remaining unscheduled quantity ({remaining_schedulable:g} m) "
+            f"for {order.order_no} at {stage.name} (order total: {order.quantity:g} m plus 10% allowance)",
+            422,
+        )
+
+    # 5. Machine validation and capacity check with row lock
     machine = None
     if data.get("machine_id"):
         machine = db.get(Machine, data["machine_id"], with_for_update=True)
@@ -74,6 +144,7 @@ def create_job(db: Session, data: dict, user: User) -> ProductionJob:
                                 f"Split the job or choose another machine/shift.")
     elif stage.code != "spinning":
         raise BusinessError("A machine must be assigned", 422)
+
     job = ProductionJob(job_no=next_number(db, ProductionJob, ProductionJob.job_no, "JOB", 5),
                         order_id=order.id, stage_code=stage.code, machine_id=machine.id if machine else None,
                         shift=data["shift"], planned_date=data["planned_date"], planned_qty=r3(qty),
@@ -102,6 +173,7 @@ def start_job(db: Session, job_id: int, user: User) -> ProductionJob:
     job.status = JobStatus.running
     job.started_at = datetime.now(timezone.utc)
     order_svc.mark_in_production(db, job.order, user)
+    db.flush()
     log_event(db, "job", job.id, "started", f"{job.job_no} started on {job.machine.code if job.machine else '-'}",
               order_id=job.order_id, user=user)
     return job
@@ -109,7 +181,7 @@ def start_job(db: Session, job_id: int, user: User) -> ProductionJob:
 
 def _check_can_run(db: Session, job: ProductionJob):
     if job.order.status == OrderStatus.on_hold:
-        raise BusinessError(f"{job.order.order_no} is on hold")
+        raise BusinessError(f"{job.order.order_no} is on hold: {job.order.hold_reason}")
     if job.order.status in (OrderStatus.cancelled, OrderStatus.completed):
         raise BusinessError(f"{job.order.order_no} is {job.order.status.value}")
     if job.machine:
@@ -120,6 +192,65 @@ def _check_can_run(db: Session, job: ProductionJob):
                                                       ProductionJob.id != job.id))
         if other:
             raise BusinessError(f"{job.machine.code} is already running {other.job_no}")
+
+    # Exclusivity: Only one active job may process a given order-stage at a time
+    active_stage_job = db.scalar(
+        select(ProductionJob).where(
+            ProductionJob.order_id == job.order_id,
+            ProductionJob.stage_code == job.stage_code,
+            ProductionJob.status == JobStatus.running,
+            ProductionJob.id != job.id,
+        )
+    )
+    if active_stage_job:
+        mach = active_stage_job.machine.code if active_stage_job.machine else "another machine"
+        raise BusinessError(
+            f"Order {job.order.order_no} already has an active {job.stage_code} job "
+            f"({active_stage_job.job_no}) running on {mach}. "
+            f"Only one active job may process a given order-stage at a time."
+        )
+
+    # Downstream prerequisites: material must have arrived from preceding stage
+    if job.stage_code == "dyeing":
+        waiting_m = get_available_material_m(db, job.order_id, "dyeing")
+        if waiting_m < job.planned_qty - EPS:
+            if waiting_m <= EPS:
+                raise BusinessError(
+                    f"Cannot start dyeing: {job.planned_qty:g} m of this order have not completed the "
+                    f"required previous stage. The job will remain queued until eligible material arrives."
+                )
+            else:
+                raise BusinessError(
+                    f"Cannot start dyeing: only {waiting_m:g} m of {job.planned_qty:g} m have arrived from "
+                    f"weaving. The job will remain queued until eligible material arrives."
+                )
+
+    elif job.stage_code == "finishing":
+        waiting_m = get_available_material_m(db, job.order_id, "finishing")
+        if waiting_m < job.planned_qty - EPS:
+            if waiting_m <= EPS:
+                raise BusinessError(
+                    f"Cannot start finishing: {job.planned_qty:g} m of this order have not completed the "
+                    f"required previous stage. The job will remain queued until eligible material arrives."
+                )
+            else:
+                raise BusinessError(
+                    f"Cannot start finishing: only {waiting_m:g} m of {job.planned_qty:g} m have completed "
+                    f"dyeing and inspection. The job will remain queued until eligible material arrives."
+                )
+
+    elif job.stage_code == "weaving":
+        for line in job.order.fabric_spec.materials:
+            need = r3(job.planned_qty * line.qty_per_m)
+            m = line.material
+            summ = inventory.material_summary(db, m)
+            avail = summ["available"] + summ["reserved"]
+            if avail < need - EPS:
+                short = round(need - avail, 3)
+                raise BusinessError(
+                    f"Cannot start weaving: insufficient yarn {m.sku} ({m.name}) in stock "
+                    f"(short by {short:g} {m.uom}). The job will remain queued until materials arrive."
+                )
 
 
 def pause_job(db: Session, job_id: int, user: User, reason: str) -> ProductionJob:
@@ -150,6 +281,7 @@ def cancel_job(db: Session, job_id: int, user: User, reason: str) -> ProductionJ
         raise BusinessError("Only planned or paused jobs can be cancelled")
     job.status = JobStatus.cancelled
     job.delay_reason = reason or job.delay_reason
+    db.flush()
     log_event(db, "job", job.id, "cancelled", f"{job.job_no} cancelled {('- ' + reason) if reason else ''}",
               order_id=job.order_id, severity="warning", user=user)
     return job
@@ -206,7 +338,7 @@ def complete_job(db: Session, job_id: int, actual_qty: float, user: User, roll_l
                  delay_reason: str = "") -> dict:
     """Complete a job. Effects depend on stage:
     - weaving: consume yarn (the defined consumption event), create rolls, charge labour/processing
-    - other machine stages: move rolls waiting at this stage to the next active stage
+    - other machine stages: move whole rolls waiting at this stage to the next active stage
     The whole operation is one transaction; any failure leaves nothing changed."""
     job = _get_job(db, job_id)
     if job.status not in (JobStatus.running, JobStatus.paused):
@@ -250,6 +382,18 @@ def complete_job(db: Session, job_id: int, actual_qty: float, user: User, roll_l
                                   .order_by(Roll.id).with_for_update()))
         if job.stage_code == "finishing":
             waiting = [r for r in waiting if r.quality == RollQuality.accepted]
+        if not waiting:
+            if job.stage_code == "finishing":
+                raise BusinessError(
+                    f"No eligible rolls of {order.order_no} are waiting at finishing with accepted quality. "
+                    f"Ensure rolls have completed dyeing and passed quality inspection before completing finishing."
+                )
+            else:
+                raise BusinessError(
+                    f"No rolls of {order.order_no} are waiting at {job.stage_code}. "
+                    f"Ensure the previous stage has produced rolls before completing this job."
+                )
+
         moved = 0.0
         nxt = next_stage_code(db, job.stage_code)
         for r in waiting:
@@ -262,13 +406,14 @@ def complete_job(db: Session, job_id: int, actual_qty: float, user: User, roll_l
                         f"{job.stage_code.title()} completed on {machine_code} ({job.job_no}, shift {job.shift}); "
                         f"moved to {STAGE_LOCATION.get(nxt, nxt)}", job.stage_code, machine_code)
             result["rolls_moved"].append(r.roll_no)
-        if not waiting:
-            raise BusinessError(f"No rolls of {order.order_no} are waiting at {job.stage_code}; "
-                                f"nothing to complete")
-        credited = r3(moved)
+
+        if moved <= EPS:
+            raise BusinessError(f"No eligible whole rolls could be moved for {actual_qty:g} m entered. "
+                                f"Enter output in whole rolls.")
         if moved + EPS < actual_qty * 0.5:
             raise BusinessError(f"Only {moved:g} m of whole rolls can be moved for {actual_qty:g} m entered. "
                                 f"Enter output in whole rolls.")
+        credited = r3(moved)
 
     job.actual_qty = r3(credited)
     job.status = JobStatus.completed
@@ -292,4 +437,173 @@ def complete_job(db: Session, job_id: int, actual_qty: float, user: User, roll_l
               + (f", {len(result['rolls_created'])} rolls created" if result["rolls_created"] else ""),
               order_id=order.id, severity="success", buyer_visible=True, user=user)
     result["credited_qty"] = credited
+    db.flush()
     return result
+
+
+def get_job_queue_info(db: Session, job: ProductionJob) -> dict:
+    """Calculates lifecycle queue state, readiness, waiting reason, and completion info for a job."""
+    info = {
+        "queue_state": job.status.value,
+        "can_start": False,
+        "can_complete": False,
+        "waiting_reason": "",
+        "available_material_m": 0.0,
+        "is_conflicting": False,
+        "expected_completion": None,
+    }
+
+    if job.status == JobStatus.completed:
+        info["queue_state"] = "completed"
+        info["available_material_m"] = job.actual_qty
+        if job.completed_at:
+            info["expected_completion"] = job.completed_at.isoformat()
+        return info
+
+    if job.status == JobStatus.cancelled:
+        info["queue_state"] = "cancelled"
+        info["waiting_reason"] = job.delay_reason or "Job cancelled"
+        return info
+
+    if job.status == JobStatus.running:
+        info["queue_state"] = "running"
+        info["can_complete"] = True
+        if job.stage_code in ("dyeing", "finishing"):
+            avail = get_available_material_m(db, job.order_id, job.stage_code)
+            info["available_material_m"] = avail
+            if avail <= EPS:
+                info["can_complete"] = False
+                info["waiting_reason"] = (
+                    f"No eligible rolls waiting at {job.stage_code} to complete"
+                )
+        else:
+            info["available_material_m"] = job.planned_qty
+
+        if job.started_at and job.machine and job.machine.capacity_per_shift > 0:
+            rate_per_hour = job.machine.capacity_per_shift / 8.0
+            hours_needed = max(0.0, (job.planned_qty - job.actual_qty) / rate_per_hour)
+            exp = job.started_at + timedelta(hours=hours_needed)
+            info["expected_completion"] = exp.isoformat()
+        return info
+
+    if job.status == JobStatus.paused:
+        info["queue_state"] = "paused"
+        info["can_complete"] = True
+        info["waiting_reason"] = job.delay_reason or "Job paused"
+        if job.stage_code in ("dyeing", "finishing"):
+            avail = get_available_material_m(db, job.order_id, job.stage_code)
+            info["available_material_m"] = avail
+            if avail <= EPS:
+                info["can_complete"] = False
+        return info
+
+    # job.status == JobStatus.planned
+    # 1. Check duplicate / conflicting bookings on same date and shift
+    conflict = db.scalar(
+        select(ProductionJob).where(
+            ProductionJob.order_id == job.order_id,
+            ProductionJob.stage_code == job.stage_code,
+            ProductionJob.planned_date == job.planned_date,
+            ProductionJob.shift == job.shift,
+            ProductionJob.status.in_(OPEN_JOB),
+            ProductionJob.id != job.id,
+        )
+    )
+    if conflict:
+        info["is_conflicting"] = True
+
+    # 2. Check if another job for this order-stage is currently running
+    active_stage_job = db.scalar(
+        select(ProductionJob).where(
+            ProductionJob.order_id == job.order_id,
+            ProductionJob.stage_code == job.stage_code,
+            ProductionJob.status == JobStatus.running,
+            ProductionJob.id != job.id,
+        )
+    )
+    if active_stage_job:
+        info["queue_state"] = "queued"
+        mach_name = active_stage_job.machine.code if active_stage_job.machine else "another machine"
+        info["waiting_reason"] = (
+            f"Active job {active_stage_job.job_no} is currently running on {mach_name}"
+        )
+        return info
+
+    # 3. Check machine state and concurrency
+    if job.machine:
+        if job.machine.state != MachineState.available:
+            info["queue_state"] = "queued"
+            info["waiting_reason"] = f"Machine {job.machine.code} is under {job.machine.state.value}"
+            return info
+        mach_running = db.scalar(
+            select(ProductionJob).where(
+                ProductionJob.machine_id == job.machine_id,
+                ProductionJob.status == JobStatus.running,
+                ProductionJob.id != job.id,
+            )
+        )
+        if mach_running:
+            info["queue_state"] = "queued"
+            info["waiting_reason"] = f"Machine {job.machine.code} is currently running {mach_running.job_no}"
+            return info
+
+    # 4. Check order status
+    if job.order.status == OrderStatus.on_hold:
+        info["queue_state"] = "queued"
+        info["waiting_reason"] = f"Order {job.order.order_no} is on hold"
+        return info
+    if job.order.status in (OrderStatus.cancelled, OrderStatus.completed):
+        info["queue_state"] = "queued"
+        info["waiting_reason"] = f"Order {job.order.order_no} is {job.order.status.value}"
+        return info
+
+    # 5. Check stage material prerequisites
+    if job.stage_code == "dyeing":
+        waiting_m = get_available_material_m(db, job.order_id, "dyeing")
+        info["available_material_m"] = waiting_m
+        if waiting_m < job.planned_qty - EPS:
+            info["queue_state"] = "waiting_for_material"
+            if waiting_m <= EPS:
+                info["waiting_reason"] = (
+                    f"Cannot start dyeing: {job.planned_qty:g} m of this order have not completed the required previous stage."
+                )
+            else:
+                info["waiting_reason"] = (
+                    f"Waiting for material: only {waiting_m:g} m of {job.planned_qty:g} m arrived from weaving."
+                )
+            return info
+
+    elif job.stage_code == "finishing":
+        waiting_m = get_available_material_m(db, job.order_id, "finishing")
+        info["available_material_m"] = waiting_m
+        if waiting_m < job.planned_qty - EPS:
+            info["queue_state"] = "waiting_for_material"
+            if waiting_m <= EPS:
+                info["waiting_reason"] = (
+                    f"Cannot start finishing: {job.planned_qty:g} m of this order have not completed the required previous stage."
+                )
+            else:
+                info["waiting_reason"] = (
+                    f"Waiting for material: only {waiting_m:g} m of {job.planned_qty:g} m accepted and ready for finishing."
+                )
+            return info
+
+    elif job.stage_code == "weaving":
+        for line in job.order.fabric_spec.materials:
+            need = r3(job.planned_qty * line.qty_per_m)
+            m = line.material
+            summ = inventory.material_summary(db, m)
+            avail = summ["available"] + summ["reserved"]
+            if avail < need - EPS:
+                short = round(need - avail, 3)
+                info["queue_state"] = "waiting_for_material"
+                info["waiting_reason"] = (
+                    f"Waiting for yarn: {m.name} short by {short:g} {m.uom}"
+                )
+                return info
+
+    # All checks passed: Job is ready to run!
+    info["queue_state"] = "ready"
+    info["can_start"] = True
+    info["waiting_reason"] = ""
+    return info

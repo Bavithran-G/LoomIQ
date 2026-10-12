@@ -183,7 +183,7 @@ def jobs(status: str | None = None, stage: str | None = None, order_id: int | No
         q = q.where(ProductionJob.planned_date <= date_to)
     if shift:
         q = q.where(ProductionJob.shift == shift)
-    return [job_out(j) for j in db.scalars(q)]
+    return [job_out(j, db) for j in db.scalars(q)]
 
 
 @router.post("/production/jobs", status_code=201)
@@ -191,7 +191,7 @@ def create_job(body: JobIn, db: Session = Depends(get_db), user: User = Depends(
     validate_planned_date(body.planned_date, "Planned date")
     j = production.create_job(db, body.model_dump(), user)
     db.commit()
-    return job_out(j)
+    return job_out(j, db)
 
 
 @router.post("/production/jobs/{jid}/action")
@@ -212,7 +212,7 @@ def job_action(jid: int, body: JobAction, db: Session = Depends(get_db), user: U
         result = production.complete_job(db, jid, body.actual_qty, user, body.roll_length, body.reason)
         j = db.get(ProductionJob, jid)
     db.commit()
-    return {"job": job_out(j), "result": result}
+    return {"job": job_out(j, db), "result": result}
 
 
 @router.get("/production/capacity")
@@ -224,6 +224,46 @@ def capacity(on: date, shift: str, stage: str = "weaving", db: Session = Depends
         out.append({"machine_id": m.id, "code": m.code, "capacity": m.capacity_per_shift, "planned": load,
                     "free": max(0.0, m.capacity_per_shift - load), "state": m.state.value})
     return out
+
+
+@router.get("/production/schedule-check")
+def schedule_check(order_id: int, stage_code: str, planned_date: date, shift: str,
+                   db: Session = Depends(get_db), _: User = Depends(require("production.view"))):
+    from sqlalchemy import func
+    from ..models import SalesOrder, ProductionJob, JobStatus
+    order = db.get(SalesOrder, order_id)
+    if not order:
+        return {"has_conflict": False, "remaining_qty": 0.0}
+
+    conflicting = db.scalar(
+        select(ProductionJob).where(
+            ProductionJob.order_id == order_id,
+            ProductionJob.stage_code == stage_code,
+            ProductionJob.planned_date == planned_date,
+            ProductionJob.shift == shift,
+            ProductionJob.status.in_(production.OPEN_JOB),
+        )
+    )
+
+    completed = float(db.scalar(select(func.coalesce(func.sum(ProductionJob.actual_qty), 0.0)).where(
+        ProductionJob.order_id == order_id,
+        ProductionJob.stage_code == stage_code,
+        ProductionJob.status == JobStatus.completed,
+    )) or 0.0)
+    opened = float(db.scalar(select(func.coalesce(func.sum(ProductionJob.planned_qty), 0.0)).where(
+        ProductionJob.order_id == order_id,
+        ProductionJob.stage_code == stage_code,
+        ProductionJob.status.in_(production.OPEN_JOB),
+    )) or 0.0)
+    remaining_qty = max(0.0, (order.quantity * 1.1) - completed - opened)
+
+    return {
+        "has_conflict": bool(conflicting),
+        "conflicting_job": conflicting.job_no if conflicting else None,
+        "conflicting_machine": conflicting.machine.code if conflicting and conflicting.machine else None,
+        "conflicting_shift": conflicting.shift if conflicting else None,
+        "remaining_qty": remaining_qty,
+    }
 
 
 @router.get("/machines")

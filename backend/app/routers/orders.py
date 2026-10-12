@@ -105,7 +105,7 @@ def get_order(oid: int, db: Session = Depends(get_db), user: User = Depends(requ
     o = _order(db, oid)
     d = order_out(db, o, True)
     d["requirements"] = inventory.order_requirements(db, o)
-    d["jobs"] = [job_out(j) for j in sorted(o.jobs, key=lambda j: j.id)]
+    d["jobs"] = [job_out(j, db) for j in sorted(o.jobs, key=lambda j: j.id)]
     d["rolls"] = [roll_out(r) for r in sorted(o.rolls, key=lambda r: r.id)]
     d["risk"] = risk.assess_order(db, o)
     d["allowed_actions"] = sorted(svc.TRANSITIONS[o.status])

@@ -25,6 +25,8 @@ export type Job = {
   priority: string; promised_date: string; stage_code: string; machine_id: number | null; machine: string | null
   shift: string; planned_date: string; planned_qty: number; actual_qty: number; status: string; operator: string
   started_at: string | null; completed_at: string | null; delay_reason: string; downtime_min: number
+  queue_state?: string; can_start?: boolean; can_complete?: boolean; waiting_reason?: string
+  available_material_m?: number; is_conflicting?: boolean; expected_completion?: string | null
 }
 export type Roll = {
   id: number; roll_no: string; order_id: number; order_no: string; buyer: string; fabric: string; colour: string

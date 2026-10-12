@@ -63,15 +63,34 @@ def movement_out(mv: StockMovement) -> dict:
             "user": mv.user.full_name if mv.user else None, "at": iso(mv.created_at)}
 
 
-def job_out(j: ProductionJob) -> dict:
-    return {"id": j.id, "job_no": j.job_no, "order_id": j.order_id, "order_no": j.order.order_no,
-            "buyer": j.order.buyer.name, "fabric": j.order.fabric_spec.name, "colour": j.order.colour,
-            "priority": j.order.priority.value, "promised_date": iso(j.order.promised_date),
-            "stage_code": j.stage_code, "machine_id": j.machine_id, "machine": j.machine.code if j.machine else None,
-            "shift": j.shift, "planned_date": iso(j.planned_date), "planned_qty": j.planned_qty,
-            "actual_qty": j.actual_qty, "status": j.status.value, "operator": j.operator,
-            "started_at": iso(j.started_at), "completed_at": iso(j.completed_at), "delay_reason": j.delay_reason,
-            "downtime_min": sum(d.minutes for d in j.downtimes)}
+def job_out(j: ProductionJob, db: Session | None = None) -> dict:
+    from sqlalchemy.orm import object_session
+    s = db or object_session(j)
+    queue_data = {}
+    if s:
+        from .services.production import get_job_queue_info
+        try:
+            queue_data = get_job_queue_info(s, j)
+        except Exception:
+            queue_data = {}
+
+    return {
+        "id": j.id, "job_no": j.job_no, "order_id": j.order_id, "order_no": j.order.order_no,
+        "buyer": j.order.buyer.name, "fabric": j.order.fabric_spec.name, "colour": j.order.colour,
+        "priority": j.order.priority.value, "promised_date": iso(j.order.promised_date),
+        "stage_code": j.stage_code, "machine_id": j.machine_id, "machine": j.machine.code if j.machine else None,
+        "shift": j.shift, "planned_date": iso(j.planned_date), "planned_qty": j.planned_qty,
+        "actual_qty": j.actual_qty, "status": j.status.value, "operator": j.operator,
+        "started_at": iso(j.started_at), "completed_at": iso(j.completed_at), "delay_reason": j.delay_reason,
+        "downtime_min": sum(d.minutes for d in j.downtimes),
+        "queue_state": queue_data.get("queue_state", j.status.value),
+        "can_start": queue_data.get("can_start", False),
+        "can_complete": queue_data.get("can_complete", False),
+        "waiting_reason": queue_data.get("waiting_reason", ""),
+        "available_material_m": queue_data.get("available_material_m", 0.0),
+        "is_conflicting": queue_data.get("is_conflicting", False),
+        "expected_completion": queue_data.get("expected_completion"),
+    }
 
 
 def machine_out(m: Machine, runtime_status: str) -> dict:

@@ -80,7 +80,21 @@ export default function Production() {
                         <div className="font-bold text-primary-navy text-[13.5px]">{j.job_no}</div>
                         <Link to={`/orders/${j.order_id}`} className="text-brand-teal hover:underline font-medium">{j.order_no}</Link> <span className="text-ink-3">· {j.buyer}</span>
                       </div>
-                      <span className="rounded-md bg-sunk border border-line px-1.5 py-0.5 text-[11px] font-semibold text-ink-2 whitespace-nowrap">{human(j.stage_code)}</span>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="rounded-md bg-sunk border border-line px-1.5 py-0.5 text-[11px] font-semibold text-ink-2 whitespace-nowrap">{human(j.stage_code)}</span>
+                        {j.status === 'planned' && (
+                          j.queue_state === 'ready' ? (
+                            <span className="rounded-md bg-ok-soft border border-ok/30 px-1.5 py-0.5 text-[11px] font-semibold text-ok whitespace-nowrap">Ready</span>
+                          ) : j.queue_state === 'waiting_for_material' ? (
+                            <span className="rounded-md bg-warn-soft/60 border border-warn/30 px-1.5 py-0.5 text-[11px] font-semibold text-warn whitespace-nowrap">Waiting for material</span>
+                          ) : (
+                            <span className="rounded-md bg-indigo-mist/40 border border-indigo-thread/30 px-1.5 py-0.5 text-[11px] font-semibold text-primary-navy whitespace-nowrap">Queued</span>
+                          )
+                        )}
+                        {j.is_conflicting && (
+                          <span className="rounded-md bg-bad/10 border border-bad/30 px-1.5 py-0.5 text-[11px] font-semibold text-bad whitespace-nowrap" title="Conflicting duplicate loom booking detected">Duplicate conflict</span>
+                        )}
+                      </div>
                     </div>
                     <div className="mt-2 grid grid-cols-2 gap-x-2 gap-y-0.5 text-[12.5px] text-ink-2">
                       <span>{j.machine ?? 'No machine'} · shift {j.shift}</span><span className="text-right">{date(j.planned_date)}</span>
@@ -90,13 +104,45 @@ export default function Production() {
                     {j.status === 'completed' && j.planned_qty > 0 && (
                       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-sunk"><div className={clsx('h-full rounded-full', j.actual_qty < j.planned_qty ? 'twill twill-warn' : 'twill twill-teal')} style={{ width: `${Math.min(100, (j.actual_qty / j.planned_qty) * 100)}%` }} /></div>
                     )}
-                    {j.delay_reason && <p className="mt-1.5 text-[12px] text-warn font-medium">{j.delay_reason}</p>}
+                    {j.waiting_reason && j.status !== 'completed' && (
+                      <p className="mt-1.5 text-[12px] text-warn font-medium bg-warn-soft/30 border border-warn/20 rounded p-1.5">
+                        ⚠ {j.waiting_reason}
+                      </p>
+                    )}
+                    {j.status === 'running' && j.expected_completion && (
+                      <p className="mt-1 text-[11.5px] text-brand-teal font-medium">
+                        Est. finish: {new Date(j.expected_completion).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    )}
+                    {j.delay_reason && !j.waiting_reason && <p className="mt-1.5 text-[12px] text-warn font-medium">{j.delay_reason}</p>}
                     {manage && j.status !== 'completed' && (
                       <div className="mt-2.5 flex flex-wrap gap-1.5">
-                        {j.status === 'planned' && <Button size="sm" variant="ok" icon={<Play className="size-3.5" />} onClick={() => act.mutate({ id: j.id, action: 'start' })}>Start</Button>}
+                        {j.status === 'planned' && (
+                          <Button
+                            size="sm"
+                            variant="ok"
+                            icon={<Play className="size-3.5" />}
+                            disabled={!j.can_start}
+                            title={!j.can_start ? (j.waiting_reason || 'Prerequisites or machine not ready') : 'Start job'}
+                            onClick={() => act.mutate({ id: j.id, action: 'start' })}
+                          >
+                            Start
+                          </Button>
+                        )}
                         {j.status === 'running' && <Button size="sm" icon={<Pause className="size-3.5" />} onClick={() => act.mutate({ id: j.id, action: 'pause', reason: 'Paused by supervisor' })}>Pause</Button>}
                         {j.status === 'paused' && <Button size="sm" variant="ok" icon={<Play className="size-3.5" />} onClick={() => act.mutate({ id: j.id, action: 'resume' })}>Resume</Button>}
-                        {(j.status === 'running' || j.status === 'paused') && <Button size="sm" variant="primary" icon={<CheckCircle2 className="size-3.5" />} onClick={() => setComplete(j)}>Complete</Button>}
+                        {(j.status === 'running' || j.status === 'paused') && (
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            icon={<CheckCircle2 className="size-3.5" />}
+                            disabled={j.can_complete === false}
+                            title={j.can_complete === false ? (j.waiting_reason || 'Cannot complete: no eligible rolls') : 'Complete job'}
+                            onClick={() => setComplete(j)}
+                          >
+                            Complete
+                          </Button>
+                        )}
                         {j.machine_id && (j.status === 'running' || j.status === 'paused') && <Button size="sm" variant="ghost" icon={<TimerOff className="size-3.5" />} onClick={() => setDown(j)}>Downtime</Button>}
                         {(j.status === 'planned' || j.status === 'paused') && <Button size="sm" variant="ghost" icon={<XCircle className="size-3.5" />} onClick={() => act.mutate({ id: j.id, action: 'cancel', reason: 'Cancelled by planner' })}>Cancel</Button>}
                       </div>
@@ -122,9 +168,18 @@ function PlanModal({ onClose }: { onClose: () => void }) {
   const orders = useQuery({ queryKey: ['orders-active'], queryFn: () => api<Order[]>('/api/orders?include_closed=false') })
   const [f, setF] = useState({ order_id: 0, stage_code: 'weaving', machine_id: 0, shift: 'A', planned_date: isoDay(), planned_qty: 180, operator: '' })
   const cap = useQuery({ queryKey: ['cap', f.planned_date, f.shift, f.stage_code], queryFn: () => api<{ machine_id: number; code: string; capacity: number; planned: number; free: number; state: string }[]>(`/api/production/capacity?on=${f.planned_date}&shift=${f.shift}&stage=${f.stage_code}`) })
+  const schedCheck = useQuery({
+    queryKey: ['sched-check', f.order_id, f.stage_code, f.planned_date, f.shift],
+    queryFn: () => f.order_id ? api<{ has_conflict: boolean; conflicting_job?: string; conflicting_machine?: string; conflicting_shift?: string; remaining_qty: number }>(`/api/production/schedule-check?order_id=${f.order_id}&stage_code=${f.stage_code}&planned_date=${f.planned_date}&shift=${f.shift}`) : null,
+    enabled: Boolean(f.order_id),
+  })
   const eligible = (orders.data ?? []).filter((o) => o.status === 'confirmed' || o.status === 'in_production')
   const sel = eligible.find((o) => o.id === f.order_id)
   const machineCap = cap.data?.find((c) => c.machine_id === f.machine_id)
+  const hasConflict = Boolean(schedCheck.data?.has_conflict)
+  const remainingSched = schedCheck.data?.remaining_qty ?? (sel ? sel.quantity : 0)
+  const exceedsQty = f.order_id > 0 && f.planned_qty > remainingSched
+
   const m = useMutation({
     mutationFn: () => api<Job>('/api/production/jobs', { body: f }),
     onSuccess: (j) => { qc.invalidateQueries(); toast('ok', `${j.job_no} planned`); onClose() },
@@ -132,16 +187,26 @@ function PlanModal({ onClose }: { onClose: () => void }) {
   })
   return (
     <Modal open onClose={onClose} title="Plan production job" wide
-      footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="primary" disabled={!f.order_id || !f.machine_id || f.planned_qty <= 0 || f.planned_date < isoDay()} loading={m.isPending} onClick={() => m.mutate()}>Plan job</Button></>}>
+      footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="primary" disabled={!f.order_id || !f.machine_id || f.planned_qty <= 0 || f.planned_date < isoDay() || hasConflict || exceedsQty} loading={m.isPending} onClick={() => m.mutate()}>Plan job</Button></>}>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Order" className="sm:col-span-2">{(id) => <Select id={id} value={f.order_id} onChange={(e) => setF({ ...f, order_id: Number(e.target.value) })}><option value={0}>Select a confirmed order</option>
           {eligible.map((o) => <option key={o.id} value={o.id}>{o.order_no} · {o.buyer} · {o.fabric} · {num(o.metrics.remaining_to_weave_m)} m left to weave · due {date(o.promised_date)}</option>)}</Select>}</Field>
         <Field label="Stage">{(id) => <Select id={id} value={f.stage_code} onChange={(e) => setF({ ...f, stage_code: e.target.value, machine_id: 0 })}><option value="weaving">Weaving</option><option value="dyeing">Dyeing</option><option value="finishing">Finishing & packing</option></Select>}</Field>
-        <Field label="Quantity (m)" hint={sel ? `Order ${num(sel.quantity)} m; ${num(sel.metrics.remaining_to_weave_m)} m still to weave` : undefined}>{(id) => <Input id={id} type="number" min={1} value={f.planned_qty} onChange={(e) => setF({ ...f, planned_qty: Number(e.target.value) })} />}</Field>
+        <Field label="Quantity (m)" hint={sel ? `Order total ${num(sel.quantity)} m; unscheduled remaining: ${num(remainingSched)} m` : undefined}>{(id) => <Input id={id} type="number" min={1} value={f.planned_qty} onChange={(e) => setF({ ...f, planned_qty: Number(e.target.value) })} />}</Field>
         <Field label="Date" error={f.planned_date < isoDay() ? 'Planned date cannot be in the past' : null}>{(id) => <Input id={id} type="date" min={isoDay()} value={f.planned_date} onChange={(e) => setF({ ...f, planned_date: e.target.value })} />}</Field>
         <Field label="Shift">{(id) => <Select id={id} value={f.shift} onChange={(e) => setF({ ...f, shift: e.target.value })}><option value="A">A (06:00–14:00)</option><option value="B">B (14:00–22:00)</option><option value="C">C (22:00–06:00)</option></Select>}</Field>
         <Field label="Operator / team" className="sm:col-span-2">{(id) => <Input id={id} value={f.operator} onChange={(e) => setF({ ...f, operator: e.target.value })} placeholder="Optional" />}</Field>
       </div>
+      {hasConflict && (
+        <Notice tone="bad" className="mt-3">
+          This order already has a {human(f.stage_code).toLowerCase()} job ({schedCheck.data?.conflicting_job}) scheduled on {schedCheck.data?.conflicting_machine} for Shift {schedCheck.data?.conflicting_shift}. Complete or cancel the existing job before scheduling the same quantity on another loom.
+        </Notice>
+      )}
+      {exceedsQty && (
+        <Notice tone="warn" className="mt-3">
+          Planned quantity ({num(f.planned_qty)} m) exceeds remaining unscheduled quantity ({num(remainingSched)} m) for {sel?.order_no} at {human(f.stage_code)}.
+        </Notice>
+      )}
       <p className="mt-4 mb-1.5 text-[13px] font-medium text-ink-2">Machine capacity for {date(f.planned_date)}, shift {f.shift}</p>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {(cap.data ?? []).map((c) => {
