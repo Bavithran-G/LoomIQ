@@ -35,6 +35,7 @@ def upgrade():
     sa.Column('labour_cost_per_m', sa.Float(), nullable=False),
     sa.Column('processing_cost_per_m', sa.Float(), nullable=False),
     sa.Column('rework_cost_per_m', sa.Float(), nullable=False),
+    sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.text('1')),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('code')
     )

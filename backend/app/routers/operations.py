@@ -75,9 +75,41 @@ def movements(limit: int = 100, db: Session = Depends(get_db), _: User = Depends
                                                   .limit(min(limit, 500)))]
 
 
+class PurchaseOrderIn(BaseModel):
+    material_id: int
+    supplier_id: int | None = None
+    qty: float = Field(gt=0)
+    unit_cost: float = Field(ge=0)
+    expected_date: date
+    po_number: str | None = None
+
+
 @router.get("/inventory/purchase-lines")
 def purchase_lines(db: Session = Depends(get_db), _: User = Depends(require("inventory.view"))):
     return [_pl(p) for p in db.scalars(select(PurchaseLine).order_by(PurchaseLine.expected_date))]
+
+
+@router.post("/inventory/purchase-orders", status_code=201)
+def create_purchase_order(body: PurchaseOrderIn, db: Session = Depends(get_db), user: User = Depends(require("inventory.manage"))):
+    from ..services.core import next_number, log_event
+    mat = db.get(Material, body.material_id)
+    if not mat:
+        raise NotFound("Material")
+    po_no = body.po_number or next_number(db, PurchaseLine, PurchaseLine.po_number, "PO")
+    pl = PurchaseLine(
+        po_number=po_no,
+        material_id=body.material_id,
+        supplier_id=body.supplier_id or mat.supplier_id,
+        qty=body.qty,
+        unit_cost=body.unit_cost if body.unit_cost > 0 else mat.standard_cost,
+        expected_date=body.expected_date,
+        status="open",
+    )
+    db.add(pl)
+    db.commit()
+    db.refresh(pl)
+    log_event(db, "stock", mat.id, "purchase_order_raised", f"Raised {po_no} for {body.qty:g} {mat.uom} of {mat.sku}", severity="info", user=user)
+    return _pl(pl)
 
 
 @router.get("/inventory/suppliers")

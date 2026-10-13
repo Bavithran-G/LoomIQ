@@ -18,8 +18,12 @@ export default function Inventory() {
   const [sel, setSel] = useState<Material | null>(null)
   const [receive, setReceive] = useState<{ material?: Material; pl?: PL } | null>(null)
   const [adjust, setAdjust] = useState(false)
+<<<<<<< HEAD
   const [adjustMode, setAdjustMode] = useState<'adjust' | 'defective'>('adjust')
   const [adjustLotId, setAdjustLotId] = useState<number | undefined>(undefined)
+=======
+  const [createPO, setCreatePO] = useState(false)
+>>>>>>> 9f900a9 (PO update)
   const mats = useQuery({ queryKey: ['materials'], queryFn: () => api<Material[]>('/api/inventory/materials') })
   const lots = useQuery({ queryKey: ['lots'], queryFn: () => api<Lot[]>('/api/inventory/lots'), enabled: tab === 'lots' || adjust })
   const moves = useQuery({ queryKey: ['moves'], queryFn: () => api<Move[]>('/api/inventory/movements?limit=200'), enabled: tab === 'moves' })
@@ -30,8 +34,13 @@ export default function Inventory() {
     <div>
       <PageHeader title="Raw-material inventory" subtitle="Yarn, dyes and chemicals by lot. Free stock can be reserved; yarn is consumed only when weaving completes."
         actions={manage && <>
+<<<<<<< HEAD
           <Button variant="secondary" className="border-warn/40 text-warn hover:bg-warn/10" icon={<AlertTriangle className="size-4 text-warn" />} onClick={() => { setAdjustMode('defective'); setAdjustLotId(undefined); setAdjust(true) }}>Remove defective stock</Button>
           <Button icon={<SlidersHorizontal className="size-4" />} onClick={() => { setAdjustMode('adjust'); setAdjustLotId(undefined); setAdjust(true) }}>Adjust stock</Button>
+=======
+          <Button icon={<SlidersHorizontal className="size-4" />} onClick={() => setAdjust(true)}>Adjust stock</Button>
+          <Button icon={<PackagePlus className="size-4" />} onClick={() => setCreatePO(true)}>Raise PO</Button>
+>>>>>>> 9f900a9 (PO update)
           <Button variant="primary" icon={<PackagePlus className="size-4" />} onClick={() => setReceive({})}>Receive goods</Button></>} />
       {mats.data && mats.data.some((m) => m.low_stock) && (
         <Notice tone="warn" className="mb-3">Below reorder level: {mats.data.filter((m) => m.low_stock).map((m) => `${m.sku} (${num(m.available)} ${m.uom} free, ${num(m.on_order)} on order)`).join('; ')}</Notice>
@@ -193,7 +202,12 @@ export default function Inventory() {
       </Panel>
       {sel && <MaterialModal m={sel} onClose={() => setSel(null)} onReceive={() => { setReceive({ material: sel }); setSel(null) }} canManage={manage} />}
       {receive && <ReceiveModal materials={mats.data ?? []} preset={receive} onClose={() => setReceive(null)} />}
+<<<<<<< HEAD
       {adjust && <AdjustModal lots={lots.data ?? []} initialMode={adjustMode} initialLotId={adjustLotId} onClose={() => setAdjust(false)} />}
+=======
+      {adjust && <AdjustModal lots={lots.data ?? []} onClose={() => setAdjust(false)} />}
+      {createPO && <NewPOModal materials={mats.data ?? []} onClose={() => setCreatePO(false)} />}
+>>>>>>> 9f900a9 (PO update)
     </div>
   )
 }
@@ -552,6 +566,57 @@ function AdjustModal({ lots, initialMode = 'adjust', initialLotId, onClose }: {
           </div>
         </div>
       )}
+    </Modal>
+  )
+}
+
+function NewPOModal({ materials, onClose }: { materials: Material[]; onClose: () => void }) {
+  const qc = useQueryClient()
+  const toast = useToast()
+  const [f, setF] = useState({
+    material_id: materials[0]?.id ?? 0,
+    qty: 500,
+    unit_cost: materials[0]?.standard_cost ?? 300,
+    expected_date: isoDay(new Date(Date.now() + 7 * 86400000)),
+  })
+  const mat = materials.find((m) => m.id === f.material_id)
+  const m = useMutation({
+    mutationFn: () => api('/api/inventory/purchase-orders', { body: f }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pls'] })
+      qc.invalidateQueries({ queryKey: ['materials'] })
+      toast('ok', 'Purchase order raised successfully')
+      onClose()
+    },
+    onError: (e) => toast('bad', (e as Error).message),
+  })
+
+  return (
+    <Modal open onClose={onClose} title="Raise Yarn / Material Purchase Order"
+      footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="primary" disabled={!f.material_id || f.qty <= 0} loading={m.isPending} onClick={() => m.mutate()}>Create Purchase Order</Button></>}>
+      <Notice className="mb-3">Open POs feed into the Risk Engine and Simulator to project yarn availability dates.</Notice>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Material" className="sm:col-span-2">
+          {(id) => (
+            <Select id={id} value={f.material_id} onChange={(e) => {
+              const mid = Number(e.target.value)
+              const selectedMat = materials.find((x) => x.id === mid)
+              setF({ ...f, material_id: mid, unit_cost: selectedMat?.standard_cost ?? f.unit_cost })
+            }}>
+              {materials.map((x) => <option key={x.id} value={x.id}>{x.sku} · {x.name} ({x.supplier ?? 'Direct'})</option>)}
+            </Select>
+          )}
+        </Field>
+        <Field label={`Order quantity (${mat?.uom ?? 'kg'})`}>
+          {(id) => <Input id={id} type="number" min={1} step="1" value={f.qty} onChange={(e) => setF({ ...f, qty: Number(e.target.value) })} />}
+        </Field>
+        <Field label="Unit cost (INR)">
+          {(id) => <Input id={id} type="number" min={0} step="0.5" value={f.unit_cost} onChange={(e) => setF({ ...f, unit_cost: Number(e.target.value) })} />}
+        </Field>
+        <Field label="Expected arrival date" className="sm:col-span-2">
+          {(id) => <Input id={id} type="date" value={f.expected_date} onChange={(e) => setF({ ...f, expected_date: e.target.value })} />}
+        </Field>
+      </div>
     </Modal>
   )
 }

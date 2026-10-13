@@ -50,17 +50,8 @@ export default function App() {
     )
   }
 
-  // Direct each role to their natural starting module
-  const roleHome: Record<string, string> = {
-    buyer: '/portal',
-    finance: '/cost',
-    storekeeper: '/inventory',
-    quality_inspector: '/quality',
-    dispatch_operator: '/dispatch',
-    production_manager: '/app',
-    admin: '/app',
-  }
-  const home = roleHome[user.role] ?? '/app'
+  // Home destination: buyers go to their isolated portal; all mill personnel land on Command Centre
+  const home = user.role === 'buyer' ? '/portal' : '/app'
 
   return (
     <Shell>
@@ -68,7 +59,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Navigate to={home} replace />} />
           <Route path="/login" element={<Navigate to={home} replace />} />
-          <Route path="/app" element={user.role === 'buyer' ? <Navigate to="/portal" replace /> : (user.role === 'finance' ? <Navigate to="/cost" replace /> : (user.role === 'storekeeper' ? <Navigate to="/inventory" replace /> : (user.role === 'quality_inspector' ? <Navigate to="/quality" replace /> : (user.role === 'dispatch_operator' ? <Navigate to="/dispatch" replace /> : <Guard perm="dashboard.view"><Overview /></Guard>))))} />
+          <Route path="/app" element={user.role === 'buyer' ? <Navigate to="/portal" replace /> : <Guard perm="dashboard.view"><Overview /></Guard>} />
           <Route path="/orders" element={<Guard perm="orders.view"><Orders /></Guard>} />
           <Route path="/orders/:id" element={<Guard perm="orders.view"><OrderDetail /></Guard>} />
           <Route path="/inventory" element={<Guard perm="inventory.view"><Inventory /></Guard>} />

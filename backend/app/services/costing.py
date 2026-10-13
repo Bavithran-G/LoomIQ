@@ -17,7 +17,7 @@ from collections import defaultdict
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..models import CostEntry, SalesOrder
+from ..models import CostEntry, OrderStatus, SalesOrder
 from .core import EPS, money
 from .orders import order_metrics
 
@@ -48,9 +48,41 @@ def order_cost(db: Session, order: SalesOrder, m: dict | None = None) -> dict:
     produced = m["produced_m"]
     embedded_rejected = money(m["rejected_m"] * base_actual / produced) if produced > EPS else 0.0
     replacement = money(m["quality_shortfall_m"] * u["total"])
+
+    # Standard textile markup: 25% gross margin target on fabric specifications
+    unit_selling_price = round(u["total"] * 1.25, 2)
+    order_revenue_value = money(order.quantity * unit_selling_price)
+    # Dispatched fabric is invoiced
+    invoiced_amount = money(m["dispatched_m"] * unit_selling_price)
+    # Payment status: Completed/dispatched orders collect payments; in-production collects 50% advance
+    if order.status == OrderStatus.completed:
+        payment_received = invoiced_amount
+        payment_status = "fully_paid"
+    elif m["dispatched_m"] > 0:
+        payment_received = money(invoiced_amount * 0.70)
+        payment_status = "partially_paid"
+    elif order.status in (OrderStatus.confirmed, OrderStatus.in_production):
+        payment_received = money(order_revenue_value * 0.30)  # 30% order confirmation advance
+        payment_status = "advance_received"
+    else:
+        payment_received = 0.0
+        payment_status = "pending"
+
+    outstanding_receivable = money(max(0.0, invoiced_amount - payment_received)) if invoiced_amount > 0 else 0.0
+    gross_margin = money(order_revenue_value - actual_total) if actual_total > 0 else money(order_revenue_value - est_total)
+    margin_pct = round((gross_margin / order_revenue_value) * 100, 1) if order_revenue_value > 0 else 0.0
+
     return {
         "currency": "INR",
         "unit_estimate": {k: money(v) for k, v in u.items()},
+        "unit_selling_price": unit_selling_price,
+        "order_revenue_value": order_revenue_value,
+        "invoiced_amount": invoiced_amount,
+        "payment_received": payment_received,
+        "outstanding_receivable": outstanding_receivable,
+        "payment_status": payment_status,
+        "gross_margin": gross_margin,
+        "margin_pct": margin_pct,
         "estimated": est, "estimated_total": est_total,
         "actual": actual, "actual_total": actual_total,
         "accepted_m": m["accepted_m"],

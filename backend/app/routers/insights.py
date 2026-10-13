@@ -105,11 +105,18 @@ def cost_orders(db: Session = Depends(get_db), _: User = Depends(require("cost.v
         out.append({"order_id": o.id, "order_no": o.order_no, "buyer": o.buyer.name, "fabric": o.fabric_spec.name,
                     "status": o.status.value, "quantity": o.quantity, "produced_m": m["produced_m"],
                     "rejected_m": m["rejected_m"], **c})
-    totals = {"estimated_total": money(sum(x["estimated_total"] for x in out)),
-              "actual_total": money(sum(x["actual_total"] for x in out)),
-              "rework_actual": money(sum(x["actual"]["rework"] for x in out)),
-              "embedded_rejected": money(sum(x["quality"]["cost_embedded_in_rejected"] for x in out)),
-              "replacement_estimate": money(sum(x["quality"]["replacement_estimate"] for x in out))}
+    totals = {
+        "estimated_total": money(sum(x["estimated_total"] for x in out)),
+        "actual_total": money(sum(x["actual_total"] for x in out)),
+        "order_revenue_value": money(sum(x.get("order_revenue_value", 0) for x in out)),
+        "invoiced_amount": money(sum(x.get("invoiced_amount", 0) for x in out)),
+        "payment_received": money(sum(x.get("payment_received", 0) for x in out)),
+        "outstanding_receivable": money(sum(x.get("outstanding_receivable", 0) for x in out)),
+        "total_gross_margin": money(sum(x.get("gross_margin", 0) for x in out)),
+        "rework_actual": money(sum(x["actual"]["rework"] for x in out)),
+        "embedded_rejected": money(sum(x["quality"]["cost_embedded_in_rejected"] for x in out)),
+        "replacement_estimate": money(sum(x["quality"]["replacement_estimate"] for x in out)),
+    }
     return {"orders": out, "totals": totals, "formulas": costing.__doc__}
 
 

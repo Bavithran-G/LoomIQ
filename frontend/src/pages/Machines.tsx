@@ -19,7 +19,9 @@ export default function Machines() {
   return (
     <div>
       <PageHeader title="Machine monitoring" subtitle="Looms, jiggers and the stenter line by current state." />
-      <Notice className="mb-4">Status is derived from production-job records and manual state changes. LoomIQ is not connected to machine sensors, so treat this as a simulated live view.</Notice>
+      <Notice className="mb-4">
+        <b>Mill Flow Note:</b> Spinning is outsourced to specialized spinners (Salem Spinners &amp; Rajapalayam Mills) who supply yarn cones directly to the warehouse. Machine monitoring tracks the mill's active internal stages: <b>Weaving Shed</b> (Air-jet looms), <b>Dyeing House</b> (Jiggers), and <b>Finishing Line</b> (Stenter).
+      </Notice>
       {isLoading && <LoadingBlock />}
       {error && <ErrorBox error={error} onRetry={refetch} />}
       {data && STAGES.map((s) => (

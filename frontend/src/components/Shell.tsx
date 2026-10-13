@@ -30,10 +30,10 @@ export const NAV = [
 export const ROLE_MODULES: Record<string, string[]> = {
   admin: ['Command Centre', 'Sales Orders', 'Inventory', 'Production Planning', 'Machine Monitoring', 'Quality Inspection', 'Roll Traceability', 'Dispatch', 'Cost Intelligence', 'Insights & Reports', 'Administration'],
   production_manager: ['Command Centre', 'Sales Orders', 'Production Planning', 'Machine Monitoring', 'Quality Inspection', 'Roll Traceability', 'Insights & Reports'],
-  storekeeper: ['Inventory', 'Roll Traceability'],
-  quality_inspector: ['Quality Inspection', 'Roll Traceability'],
-  dispatch_operator: ['Dispatch', 'Roll Traceability', 'Sales Orders'],
-  finance: ['Cost Intelligence', 'Insights & Reports'],
+  storekeeper: ['Command Centre', 'Inventory', 'Roll Traceability'],
+  quality_inspector: ['Command Centre', 'Quality Inspection', 'Roll Traceability'],
+  dispatch_operator: ['Command Centre', 'Dispatch', 'Roll Traceability', 'Sales Orders'],
+  finance: ['Command Centre', 'Cost Intelligence', 'Insights & Reports'],
   buyer: ['Buyer Portal'],
 }
 
